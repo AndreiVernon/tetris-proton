@@ -11,8 +11,11 @@ Andrei - game coder and everything else + coordination
 
 Raahil - graphics + physical box design
 -write function that you can pass an array of 64x64=4096 pixels to, and it updates the display with the new pixels
--can have an init function that sets up DMA and then some way to just trigger DMA to have it automatically copy the data
--design interesting box / arcade cabinet / console setup. should have plugs for DC power, usb port for multiplayer connection, 3.5mm audio
+-can have an init function that sets up DMA and then some way to just trigger DMA to have it automatically copy the data to the display out array
+-design interesting box / arcade cabinet / console setup
+--should have plugs for DC power, usb port for multiplayer connection, 3.5mm audio
+--maybe have an indent where you can put the nes controller when not using it
+--hinge that lets the screen fold in?
 -come up with interesting graphical visual effects we can have for different game events (line clear, mp garbage send, win, lose, etc) 
 
 Amy - audio + UI coder
@@ -55,7 +58,6 @@ audio:
 -buffer with an op-amp?
 -use high PWM frequency (>=100khz) to limit ripple
 -aim to for LPF cutoff slightly higher than 20khz
--(dont do this) use multiple PWM channels and combine them with summing amp for complex audio?
 -playing complex audio blog: https://antirez.com/news/143
--amy goal: get complex audio playing (tetris?) within our audio budget
--full tetris theme in 44.1k 8bit wav is 3.24MB, fits within total 16MB flash budget
+-amy goal: get complex audio playing (tetris?) within total 16MB flash memory budget
+-when playing multiplayer, run audio from only one console and use UART comms to control the other machine's sound effects
