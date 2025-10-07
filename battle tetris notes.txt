@@ -1,0 +1,61 @@
+TEAM NEXUS
+
+objectives:
+An ability to use GPIO/PIO to drive a 64x64 Adafruit LED matrix display
+An ability to use GPIO to interface with an NES game controller
+An ability to use UART to communicate between two proton boards (in order to implement multiplayer)
+An ability to use PWM to drive speaker and produce limited sound effects
+
+roles
+Andrei - game coder and everything else + coordination
+
+Raahil - graphics + physical box design
+-write function that you can pass an array of 64x64=4096 pixels to, and it updates the display with the new pixels
+-can have an init function that sets up DMA and then some way to just trigger DMA to have it automatically copy the data
+-design interesting box / arcade cabinet / console setup. should have plugs for DC power, usb port for multiplayer connection, 3.5mm audio
+-come up with interesting graphical visual effects we can have for different game events (line clear, mp garbage send, win, lose, etc) 
+
+Amy - audio + UI coder
+-implement full wav audio playback using PWM (see notes below) to 3.5mm line level audio (involves filtering circuit)
+--figure out a way to store the audio data in memory
+-write function that triggers one of two PWM channels to start playing a sound, with options for which sound it is, and whether it should loop infinitely
+-implement a font with kerning (try using the bold font in pixelfont.jpg)
+-write function that, given the display output array, coordinates, color code, and a string, prints text to the display in our default font with the top left corner at the listed coords
+-design UI for all of the options we'll have
+
+Davis - multiplayer wiring + inputs
+-implement UART over usb-a cable (has 4 pins we can use for GND,RX,TX)
+-write a function that checks if the other console is connected and establishes UART comms
+-write a function that can send arbitrary message to other console
+-figure out NES controller connection
+-write functions to init controller connection, detect whether it's plugged in or not, and poll to get current controller input
+
+tetris code reference:
+https://github.com/rbirkby/picotetris
+
+aesthetics:
+-different piece color schemes
+-full tetris music + sound effects - all three theme options from original game
+-visual effects in singleplayer and multiplayer for line clears
+-fully implemented custom font UI with highlighting for selection
+
+connection ideas:
+-use usb-a male to male to connect boards
+--each one would use a breakout board to connect to UART pins
+--4 pins: TX, RX, GND, and 1 extra (presence detection?)
+
+display:
+-using PIO to drive the display might be more efficient than bitbanging but would prob be more complex to code (make raahil do it)
+
+audio:
+-can use my speakers since they have a line in connection
+--output the same signal on both L+R channels from each console, then wire so we have left speaker for one console and right speaker for the other one
+--or we can just play audio from only one console, so instead of playing same signal on both channels, can use one channel for music and the other for effects
+--need 0.9Vpp for line level input (AUX/RCA unbalanced input: -10dBV)
+-buffer with an op-amp?
+-use high PWM frequency (>=100khz) to limit ripple
+-aim to for LPF cutoff slightly higher than 20khz
+-(dont do this) use multiple PWM channels and combine them with summing amp for complex audio?
+-playing complex audio blog: https://antirez.com/news/143
+-amy goal: get complex audio playing (tetris?) within our audio budget
+-full tetris theme in 44.1k 8bit wav is 3.24MB, fits within total 16MB flash budget

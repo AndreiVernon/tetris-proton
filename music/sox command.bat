@@ -1,0 +1,1 @@
+sox "Tetris Theme (cut).flac" -R -G -b 4 "tetris sox 40k 4b.wav" rate -v -L 40000 dither
