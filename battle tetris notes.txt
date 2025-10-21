@@ -16,7 +16,7 @@ Raahil - graphics + physical box design
 --should have plugs for DC power, usb port for multiplayer connection, 3.5mm audio
 --maybe have an indent where you can put the nes controller when not using it
 --hinge that lets the screen fold in?
--come up with interesting graphical visual effects we can have for different game events (line clear, mp garbage send, win, lose, etc) 
+-come up with interesting graphical visual effects we can have for different game events (line clear, mp garbage send, win, lose, etc)
 
 Amy - audio + UI coder
 -implement full wav audio playback using PWM (see notes below) to 3.5mm line level audio (involves filtering circuit)
@@ -41,6 +41,7 @@ aesthetics:
 -full tetris music + sound effects - all three theme options from original game
 -visual effects in singleplayer and multiplayer for line clears
 -fully implemented custom font UI with highlighting for selection
+-probably won't run display at max brightness - some effects can involve making some pixels a lot brighter
 
 connection ideas:
 -use usb-a male to male to connect boards
