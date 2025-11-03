@@ -1,0 +1,6 @@
+{
+    "files.associations": {
+        "*.vpy": "python",
+        "string.h": "c"
+    }
+}
