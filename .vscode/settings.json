@@ -1,6 +1,8 @@
 {
     "files.associations": {
         "*.vpy": "python",
-        "string.h": "c"
+        "string.h": "c",
+        "rand.h": "c",
+        "stdbool.h": "c"
     }
 }

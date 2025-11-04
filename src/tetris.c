@@ -1,109 +1,174 @@
-#include <stdbool.h>
-#include <string.h>
-#include <time.h>
-#include <stdio.h>
-#include <hardware/gpio.h>
 #include "pico/stdlib.h"
+#include "pico/rand.h"
 #include "tetris.h"
+#include "graphics.h"
+
+
+//playfield dims
+#define M_WIDTH 10
+#define M_HEIGHT 23  //+1 for 5 large I piece
+
+#define I_PIECE 0
+#define O_PIECE 1
+#define S_PIECE 2
+#define Z_PIECE 3
+#define T_PIECE 4
+#define L_PIECE 5
+#define J_PIECE 6
+
+
+struct Piece {
+    int shape;          //shape id, 0-6
+    int x, y;           //coords, x=0 is left and y=0 is bottom
+    int rotation;       //0, 1=R, 2, 3=L
+    uint8_t mask[25];   //shape mask
+    int size;           //mask size
+};
 
 uint8_t matrix[M_HEIGHT][M_WIDTH];
 uint32_t score = 0;
-bool gameOver = false;
-uint8_t currPiece, currRotation, currX, currY, heldPiece;
-uint8_t randBag[14];
-uint8_t randBagLoc;
+bool game_over = false;
 
-const int tetrominoes[8][8] = {
-    {0, 0, 0, 0, 0, 0, 0, 0},  // blank
-    {0, 0, 0, 0, 1, 1, 1, 1},  // I (1)
-    {0, 1, 1, 0, 0, 1, 1, 0},  // O (2)
-    {0, 1, 1, 0, 1, 1, 0, 0},  // S (3)
-    {1, 1, 0, 0, 0, 1, 1, 0},  // Z (4)
-    {0, 1, 0, 0, 1, 1, 1, 0},  // T (5)
-    {0, 0, 1, 0, 1, 1, 1, 0},  // L (6)
-    {1, 0, 0, 0, 1, 1, 1, 0}   // J (7)
-};
+struct Piece piece;         //currently active piece
+int held_piece = -1;        //shape of held piece
+bool hold_avail = true;     //can hold piece
+int rand_bag[14];           //bag of upcoming pieces
+int rand_bag_loc;           //index of bag
 
-int gameloop() {
+const int piece_mask_sizes[7] = {5, 3, 3, 3, 3, 3, 3};
+const uint8_t piece_masks[7][25] = {
+    {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},  // I (0)
+    {0, 1, 1, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},  // O (1)
+    {0, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},  // S (2)
+    {1, 1, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},  // Z (3)
+    {0, 1, 0, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},  // T (4)
+    {0, 0, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},  // L (5)
+    {1, 0, 0, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}   // J (6)
+};  //      ||       ||       || (3x3)
+
+
+int game_loop() {
     memset(matrix, 0, sizeof(uint8_t) * M_HEIGHT * M_WIDTH);
-    srand(timer_hw->timerawl);
-
+    
     //set up bag
-    genRandBag(false);
-    genRandBag(true);
+    gen_rand_bag(false);
+    gen_rand_bag(true);
 
-    newPiece();
+    //game start animation here
 
-    int curFrame = 0;
+    new_piece(-1);
 
-    while (!gameOver) {
-        int targetFrametime = (curFrame + 1) * 100000 / TARGET_FRAMERATE;  //in us
-        curFrame = (curFrame + 1) % TARGET_FRAMERATE;
+    while (!game_over) {
+        //process_inputs here
 
-
+        //render_frame here
+        while (!frame_ready) tight_loop_contents();
+        //display_frame here (set frame ready to false at start of this func)
     }
 
     return 0;
 }
 
 //place new tetrimino
-void newPiece() {
-    currPiece = randBag[randBagLoc++];
+void new_piece(int new_shape) {
+    //default
+    if (new_shape == -1) piece.shape = rand_bag[rand_bag_loc++];
+    //called by hold_piece
+    else piece.shape = new_shape;
 
-    currRotation = 0;
-    //currX = (A_WIDTH / 2) - (T_WIDTH / 2);
-    currY = 0;
+    piece.rotation = 0;
+    
+    //I piece is 5x5
+    if (piece.shape == I_PIECE) {
+        piece.x = 2;
+        piece.y = 22;
+        piece.size = 5;
+    } else {
+        piece.x = 3;
+        piece.y = 21;
+        piece.size = 3;
+    }
+    
+    //get shape mask
+    memcpy(piece.mask, piece_masks[piece.shape], piece.size * piece.size);
 
     //got to end of current bag
-    if (randBagLoc >= 7) {
+    if (rand_bag_loc >= 7) {
         //move second half pieces to first half
         for (int i = 0; i < 7; i++)
-            randBag[i] = randBag[i+7];
+            rand_bag[i] = rand_bag[i+7];
         
-        randBagLoc = 0;
-        genRandBag(true);
+        rand_bag_loc = 0;
+        gen_rand_bag(true);
     }
 
     //gameOver = !validPos(currTetrominoIdx, currRotation, currX, currY);
 }
 
 //generates random bag of tetriminos
-void genRandBag(bool secondHalf) {
-    int *arr = &randBag[secondHalf * 7];
+void gen_rand_bag(bool second_half) {
+    int *arr = &rand_bag[second_half ? 7 : 0];
 
+    //fill array with numbers 0-6
     for (int i = 0; i < 7; i++)
-        arr[i] = i + 1;
+        arr[i] = i;
 
-    //Fisher-Yates shuffle
-    for (int i = 7 - 1; i > 0; i--) {
-        int j = rand() % (i + 1);
+    //Fisher-Yates shuffle (uniform sampling)
+    for (int i = 6; i > 0; i--) {
+        int j;
+        int limit = UINT32_MAX - (UINT32_MAX % (i + 1));
+
+        do {
+            j = rand();
+        } while (j >= limit);
+
+        j %= (i + 1);
+
         int temp = arr[i];
         arr[i] = arr[j];
         arr[j] = temp;
     }
 }
 
-//move tetrimino
+//move piece
 void move() {
 
 }
 
-//rotate tetrimino
+//rotate piece
 void rotate() {
 
 }
 
-//drop tetrimino one space
-void softDrop() {
+//drop piece slowly
+void soft_drop() {
 
 }
 
-//hard drop tetrimino
-void hardDrop() {
+//drop piece instantly
+void hard_drop() {
 
 }
 
 //hold / swap held piece
-void holdPiece() {
+void hold_piece() {
+    if (!hold_avail) return;
+    else hold_avail = false;
+
+    int temp = held_piece;
+    held_piece = piece.shape;
+
+    //if originally held piece is -1 (empty), new piece will come from bag
+    new_piece(temp);
+    return;
+}
+
+//locks location of the piece and adds to playfield
+void lock_piece() {
+
+}
+
+//checks for completed lines and removes them
+void check_lines() {
 
 }
