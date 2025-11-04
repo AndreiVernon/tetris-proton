@@ -1,3 +1,7 @@
+#include <stdio.h>
+#include <math.h>
+#include <stdlib.h>
+#include <string.h>
 #include "pico/stdlib.h"
 #include "pico/rand.h"
 #include "tetris.h"
@@ -15,40 +19,42 @@
 #define T_PIECE 4
 #define L_PIECE 5
 #define J_PIECE 6
+#define EMPTY 255
 
 
-struct Piece {
+typedef struct _Piece {
     int shape;          //shape id, 0-6
     int x, y;           //coords, x=0 is left and y=0 is bottom
     int rotation;       //0, 1=R, 2, 3=L
     uint8_t mask[25];   //shape mask
     int size;           //mask size
-};
+} Piece;
 
 uint8_t matrix[M_HEIGHT][M_WIDTH];
 uint32_t score = 0;
 bool game_over = false;
 
-struct Piece piece;         //currently active piece
+Piece piece;         //currently active piece
 int held_piece = -1;        //shape of held piece
 bool hold_avail = true;     //can hold piece
 int rand_bag[14];           //bag of upcoming pieces
 int rand_bag_loc;           //index of bag
 
 const int piece_mask_sizes[7] = {5, 3, 3, 3, 3, 3, 3};
+//from bottom left to top right
 const uint8_t piece_masks[7][25] = {
     {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},  // I (0)
-    {0, 1, 1, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},  // O (1)
-    {0, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},  // S (2)
-    {1, 1, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},  // Z (3)
-    {0, 1, 0, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},  // T (4)
-    {0, 0, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},  // L (5)
-    {1, 0, 0, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}   // J (6)
+    {0, 0, 0, 0, 1, 1, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},  // O (1)
+    {0, 0, 0, 1, 1, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},  // S (2)
+    {0, 0, 0, 0, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},  // Z (3)
+    {0, 0, 0, 1, 1, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},  // T (4)
+    {0, 0, 0, 1, 1, 1, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},  // L (5)
+    {0, 0, 0, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}   // J (6)
 };  //      ||       ||       || (3x3)
 
 
 int game_loop() {
-    memset(matrix, 0, sizeof(uint8_t) * M_HEIGHT * M_WIDTH);
+    memset(matrix, EMPTY, sizeof(uint8_t) * M_HEIGHT * M_WIDTH);
     
     //set up bag
     gen_rand_bag(false);
@@ -165,10 +171,21 @@ void hold_piece() {
 
 //locks location of the piece and adds to playfield
 void lock_piece() {
-
+    for (int y = 0; y < piece.size; y++) {
+        for (int x = 0; x < piece.size; x++) {
+            if (piece.mask[y * piece.size + x]) {
+                matrix[piece.y + y][piece.x + x] = piece.shape;
+            }
+        }
+    }
 }
 
 //checks for completed lines and removes them
 void check_lines() {
 
 }
+
+/* //convert xy coordinates to index of playfield matrix
+int coord_to_matrix(int x, int y) {
+    return (M_HEIGHT - y - 1) * M_WIDTH + x;
+} */
