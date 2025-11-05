@@ -108,7 +108,8 @@ void new_piece(int new_shape) {
         gen_rand_bag(true);
     }
 
-    //gameOver = !validPos(currTetrominoIdx, currRotation, currX, currY);
+    //game over check
+    game_over = is_colliding();
 }
 
 //generates random bag of tetriminos
@@ -169,6 +170,21 @@ void hold_piece() {
     return;
 }
 
+//check if current piece is colliding with blocks on playfield
+//returns true if colliding
+bool is_colliding() {
+    for (int y = 0; y < piece.size; y++) {
+        for (int x = 0; x < piece.size; x++) {
+            if (piece.mask[y * piece.size + x]) {
+                if (matrix[piece.y + y][piece.x + x] != EMPTY)
+                    return true;
+            }
+        }
+    }
+
+    return false;
+}
+
 //locks location of the piece and adds to playfield
 void lock_piece() {
     for (int y = 0; y < piece.size; y++) {
@@ -178,10 +194,97 @@ void lock_piece() {
             }
         }
     }
+
+    //game over check
+    //only game over if every block in piece is oob
+    if (piece.y >= 20 - piece.size) {
+        bool oob = true;
+
+        for (int y = 0; y < piece.size; y++) {
+            for (int x = 0; x < piece.size; x++) {
+                if (piece.mask[y * piece.size + x]) {
+                    if (piece.y + y < 20) {
+                        oob = false;
+                        goto nested_break;
+                    }
+                }
+            }
+        }
+        nested_break:
+
+        if (oob) game_over = true;
+    }
+}
+
+//shifts every line above `row` by amount
+void shift_lines(int row, int amount) {
+    if (amount == 0) return;
+
+    //direction matters, avoid overwriting line data
+    if (amount > 0) {
+        for (int y = M_HEIGHT - 1; y >= row; y--) {
+            //avoid out of bounds access
+            if ((y - amount >= M_HEIGHT) || (y - amount < 0))
+                memset(matrix[y], EMPTY, M_WIDTH);
+            else
+                memcpy(matrix[y], matrix[y - amount], M_WIDTH);
+        }
+    } else {
+        for (int y = row; y < M_HEIGHT; y++) {
+            //avoid out of bounds access
+            if ((y - amount >= M_HEIGHT) || (y - amount < 0))
+                memset(matrix[y], EMPTY, M_WIDTH);
+            else
+                memcpy(matrix[y], matrix[y - amount], M_WIDTH);
+        }
+    }
+
+    //game over check
+    //only game over if shift up + piece oob,
+    //regardless of whether shift caused piece to be oob
+    if (amount > 0) {
+        for (int y = 20; y < M_HEIGHT; y++) {
+            for (int x = 0; x < M_WIDTH; x++) {
+                if (x != EMPTY) {
+                    game_over = true;
+                    goto nested_break;
+                }
+            }
+        }
+    }
+    nested_break:
+
 }
 
 //checks for completed lines and removes them
 void check_lines() {
+    for (int y = 0; y < M_HEIGHT; y++) {
+        int cleared_cnt = 0;
+
+        for (int x = 0; x < M_WIDTH; x++) {
+            if (matrix[y][x] == EMPTY)
+                break;
+            else
+                cleared_cnt++;
+        }
+
+        //line has been cleared
+        if (cleared_cnt == M_WIDTH) {
+            shift_lines(y, -1);
+            //TODO: score up
+        }
+    }
+}
+
+//add garbage in multiplayer moded
+void add_garbage() {
+    //gonna have to come up with garbage shapes
+    //shift_lines(0, size_of_garbage);
+}
+
+//update position and shape of active piece's "shadow"
+//should turn off during a game over
+void update_shadow() {
 
 }
 
