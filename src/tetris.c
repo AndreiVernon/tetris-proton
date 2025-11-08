@@ -282,12 +282,6 @@ void add_garbage() {
     //shift_lines(0, size_of_garbage);
 }
 
-//update position and shape of active piece's "shadow"
-//should turn off during a game over
-void update_shadow() {
-
-}
-
 /* //convert xy coordinates to index of playfield matrix
 int coord_to_matrix(int x, int y) {
     return (M_HEIGHT - y - 1) * M_WIDTH + x;
