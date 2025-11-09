@@ -34,7 +34,8 @@ uint8_t matrix[M_HEIGHT][M_WIDTH];
 uint32_t score = 0;
 bool game_over = false;
 
-Piece piece;         //currently active piece
+Piece piece;        //currently active piece
+Piece ghost_piece;        //ghost piece / shadow of active piece
 int held_piece = -1;        //shape of held piece
 bool hold_avail = true;     //can hold piece
 int rand_bag[14];           //bag of upcoming pieces
@@ -87,11 +88,15 @@ void new_piece(int new_shape) {
     //I piece is 5x5
     if (piece.shape == I_PIECE) {
         piece.x = 2;
-        piece.y = 22;
+        piece.y = 18;
         piece.size = 5;
+    } else if (piece.shape == O_PIECE) {
+        piece.x = 4;
+        piece.y = 20;
+        piece.size = 2;
     } else {
         piece.x = 3;
-        piece.y = 21;
+        piece.y = 19;
         piece.size = 3;
     }
     
@@ -137,23 +142,94 @@ void gen_rand_bag(bool second_half) {
     }
 }
 
-//move piece
-void move() {
+//move piece left or right
+//dir: 0 = left, 1 = right
+void move(bool dir) {
+    int x_old = piece.x;
 
+    if (dir) piece.x++;
+    else piece.x--;
+
+    if (is_colliding()) piece.x = x_old;
 }
 
-//rotate piece
-void rotate() {
 
+int main_offset_data_length[4] = {0, 5, 0, 5};
+int8_t main_offset_data[4][5][2] = {
+    {{0, 0}, {0, 0}, {0, 0}, {0, 0}, {0, 0}},
+    {{0, 0}, {0, 0}, {0, 0}, {0, 0}, {0, 0}},
+    {{0, 0}, {0, 0}, {0, 0}, {0, 0}, {0, 0}},
+    {{0, 0}, {0, 0}, {0, 0}, {0, 0}, {0, 0}}
+};
+
+int8_t i_offset_data[8][5][2] = {
+    {{0, 0}, {0, 0}, {0, 0}, {0, 0}, {0, 0}},
+    {{0, 0}, {0, 0}, {0, 0}, {0, 0}, {0, 0}},
+    {{0, 0}, {0, 0}, {0, 0}, {0, 0}, {0, 0}},
+    {{0, 0}, {0, 0}, {0, 0}, {0, 0}, {0, 0}},
+    {{0, 0}, {0, 0}, {0, 0}, {0, 0}, {0, 0}},
+    {{0, 0}, {0, 0}, {0, 0}, {0, 0}, {0, 0}},
+    {{0, 0}, {0, 0}, {0, 0}, {0, 0}, {0, 0}},
+    {{0, 0}, {0, 0}, {0, 0}, {0, 0}, {0, 0}}
+};
+
+//rotate piece
+//cw: rotate clockwise
+void rotate(bool cw) {
+    if (piece.shape == O_PIECE) return;
+
+    uint8_t mask_old[25];
+    memcpy(mask_old, piece.mask, piece.size * piece.size);
+    int size = piece.size;
+
+    //perform matrix rotation on mask
+    if (cw) {
+        for (int r = 0; r < size; r++) {
+            for (int c = 0; c < size; c++) {
+                piece.mask[c * size + (size - 1 - r)] = mask_old[r * size + c];
+            }
+        }
+    } else {
+        for (int r = 0; r < size; r++) {
+            for (int c = 0; c < size; c++) {
+                piece.mask[(size - 1 - c) * size + r] = mask_old[r * size + c];
+            }
+        }
+    }
+
+    //add piece offsets
+
+    //set rotation var
+    if (cw) piece.rotation = (piece.rotation + 1) % 4;
+    else piece.rotation = (piece.rotation - 1) % 4;
 }
 
 //drop piece slowly
 void soft_drop() {
+    piece.y--;
+    if (is_colliding()) piece.y++;
+}
 
+//update ghost piece
+void update_ghost() {
+    ghost_piece = piece;
+    hard_drop(true);
 }
 
 //drop piece instantly
-void hard_drop() {
+void hard_drop(bool ghost) {
+    Piece* piece_sel = ghost ? &ghost_piece : &piece;
+
+    //go from -2 to height+2 cause thats the highest/lowest a piece can be within mask
+    for (int y = -2; y < M_HEIGHT+2; y++) {
+        piece_sel->y = y;
+        if (!is_colliding()) break;
+    }
+
+    if (!ghost) lock_piece();
+}
+
+void do_gravity() {
 
 }
 
@@ -171,11 +247,17 @@ void hold_piece() {
 }
 
 //check if current piece is colliding with blocks on playfield
-//returns true if colliding
+//returns true if colliding or out of bounds
 bool is_colliding() {
     for (int y = 0; y < piece.size; y++) {
         for (int x = 0; x < piece.size; x++) {
+            //check every active block in piece mask
             if (piece.mask[y * piece.size + x]) {
+                //check for oob
+                if (piece.x + x < 0 || piece.x + x >= M_WIDTH || piece.y + y < 0 || piece.y + y >= M_HEIGHT)
+                    return true;
+
+                //check for collision
                 if (matrix[piece.y + y][piece.x + x] != EMPTY)
                     return true;
             }
