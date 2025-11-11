@@ -19,7 +19,8 @@
 #define T_PIECE 4
 #define L_PIECE 5
 #define J_PIECE 6
-#define EMPTY 255
+#define GARBAGE 7
+#define EMPTY 67
 
 
 typedef struct _Piece {
@@ -154,23 +155,34 @@ void move(bool dir) {
 }
 
 
-int main_offset_data_length[4] = {0, 5, 0, 5};
-int8_t main_offset_data[4][5][2] = {
-    {{0, 0}, {0, 0}, {0, 0}, {0, 0}, {0, 0}},
-    {{0, 0}, {0, 0}, {0, 0}, {0, 0}, {0, 0}},
-    {{0, 0}, {0, 0}, {0, 0}, {0, 0}, {0, 0}},
-    {{0, 0}, {0, 0}, {0, 0}, {0, 0}, {0, 0}}
+int8_t rotate_offset_data[4][5][2] = {
+    {{0, 0}, {0, 0}, {0, 0}, {0, 0}, {0, 0}},   //0
+    {{0, 0}, {1, 0}, {1, -1}, {0, 2}, {1, 2}},  //R
+    {{0, 0}, {0, 0}, {0, 0}, {0, 0}, {0, 0}},   //2
+    {{0, 0}, {-1, 0}, {-1, -1}, {0, 2}, {-1, 2}}//L
 };
 
-int8_t i_offset_data[8][5][2] = {
-    {{0, 0}, {0, 0}, {0, 0}, {0, 0}, {0, 0}},
-    {{0, 0}, {0, 0}, {0, 0}, {0, 0}, {0, 0}},
-    {{0, 0}, {0, 0}, {0, 0}, {0, 0}, {0, 0}},
-    {{0, 0}, {0, 0}, {0, 0}, {0, 0}, {0, 0}},
-    {{0, 0}, {0, 0}, {0, 0}, {0, 0}, {0, 0}},
-    {{0, 0}, {0, 0}, {0, 0}, {0, 0}, {0, 0}},
-    {{0, 0}, {0, 0}, {0, 0}, {0, 0}, {0, 0}},
-    {{0, 0}, {0, 0}, {0, 0}, {0, 0}, {0, 0}}
+//ccw at even indices, cw at odd indices
+int8_t rotate_offset_data_i_base[8][2] = {
+    {0, -1},    //0->L
+    {1, 0},     //0->R
+    {-1, 0},    //R->0
+    {0, -1},    //R->2
+    {0, 1},     //2->R
+    {-1, 0},    //2->L
+    {1, 0},     //L->2
+    {0, 1}      //L->0
+};
+
+int8_t rotate_offset_data_i_arika[8][5][2] = {
+    {{0,0}, {2,0}, {-1,0}, {-1,2}, {2,-1}},   //0->L
+    {{0,0}, {-2,0}, {1,0}, {1,2}, {-2,-1}},   //0->R
+    {{0,0}, {2,0}, {-1,0}, {2,1}, {-1,-2}},   //R->0
+    {{0,0}, {-1,0}, {2,0}, {-1,2}, {2,-1}},   //R->2
+    {{0,0}, {-2,0}, {1,0}, {-2,1}, {1,-1}},   //2->R
+    {{0,0}, {2,0}, {-1,0}, {2,1}, {-1,-1}},   //2->L
+    {{0,0}, {1,0}, {-2,0}, {1,2}, {-2,-1}},   //L->2
+    {{0,0}, {-2,0}, {1,0}, {-2,1}, {1,-2}}    //L->0
 };
 
 //rotate piece
@@ -182,7 +194,7 @@ void rotate(bool cw) {
     memcpy(mask_old, piece.mask, piece.size * piece.size);
     int size = piece.size;
 
-    //perform matrix rotation on mask
+    //perform matrix rotation on piece mask
     if (cw) {
         for (int r = 0; r < size; r++) {
             for (int c = 0; c < size; c++) {
@@ -196,12 +208,45 @@ void rotate(bool cw) {
             }
         }
     }
+    
+    int rotation_target = (piece.rotation + (cw ? 1 : -1)) % 4;
+    int x_old = piece.x;
+    int y_old = piece.y;
+    bool success = false;
 
     //add piece offsets
+    if (piece.shape == I_PIECE) {
+        for (int i = 0; i < 5; i++) {
+            piece.x = x_old + rotate_offset_data_i_base[piece.rotation*2 + cw][0] + rotate_offset_data_i_arika[piece.rotation*2 + cw][i][0];
+            piece.y = y_old + rotate_offset_data_i_base[piece.rotation*2 + cw][1] + rotate_offset_data_i_arika[piece.rotation*2 + cw][i][1];
+            
+            if (!is_colliding()) {
+                success = true;
+                break;
+            }
+        }
+    } else {
+        for (int i = 0; i < 5; i++) {
+            piece.x = x_old + rotate_offset_data[piece.rotation][i][0] - rotate_offset_data[rotation_target][i][0];
+            piece.y = y_old + rotate_offset_data[piece.rotation][i][1] - rotate_offset_data[rotation_target][i][1];
+            
+            if (!is_colliding()) {
+                success = true;
+                break;
+            }
+        }
+    }
 
-    //set rotation var
-    if (cw) piece.rotation = (piece.rotation + 1) % 4;
-    else piece.rotation = (piece.rotation - 1) % 4;
+    //if nothing worked, undo
+    if (!success) {
+        piece.x = x_old;
+        piece.y = y_old;
+        memcpy(piece.mask, mask_old, piece.size * piece.size);
+        return;
+    }
+
+    //if succeeded, set new rotation state
+    piece.rotation = rotation_target;
 }
 
 //drop piece slowly

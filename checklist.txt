@@ -10,10 +10,10 @@ X-add locked piece to playfield matrix
 X-move many lines up or down playfield at once
 X-check for cleared lines
 X-move piece
--rotate piece
+X-rotate piece
 X--matrix rotation
---rotation offset tables
----derive Arika wall kick data for I piece
+X--rotation offset tables
+X---derive Arika wall kick data for I piece
 -gravity
 X-soft drop piece
 X-hard drop piece
