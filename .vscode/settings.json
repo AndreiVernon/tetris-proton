@@ -2,6 +2,11 @@
     "files.associations": {
         "*.vpy": "python",
         "string.h": "c",
+<<<<<<< HEAD
         "tetris.h": "c"
+=======
+        "rand.h": "c",
+        "stdbool.h": "c"
+>>>>>>> 36c6002722a5dfe263a005e8a9843a63aa01a45f
     }
 }
