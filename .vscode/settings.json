@@ -1,6 +1,7 @@
 {
     "files.associations": {
         "*.vpy": "python",
-        "string.h": "c"
+        "string.h": "c",
+        "tetris.h": "c"
     }
 }
