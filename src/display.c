@@ -1,36 +1,47 @@
 #include "pico/stdlib.h"
 #include "hardware/dma.h"
 #include "hardware/gpio.h"
+#include <string.h>
 
 // 64x64 RGB LED Matrix - 3mm Pitch - 192mm x 192mm; Product ID: 4732
 // https://www.adafruit.com/product/4732
-// -----------------------------------  -----------------------------------
-// |  1  2  3  4  5  6  7  8        | [R1] [G1] [B1] [R2] [G2] [B2] [A] [B] 
-// |  9 10 11 12 13 14 15 16       | [C] [D ] [E ] [CLK][LAT][OE][GND][GND]
-// -----------------------------------  -----------------------------------
+// ------------------------------------------------------------------------
+// correct pinout
+// R1 [x x] G1
+// B1 [x x] GND
+// R2 [x x] G2
+// B2 [x x] GND
+// A  [x x] B
+// C  [x x] D
+// CLK[x x] LAT
+// OE [x x] GND
+
+// https://docs.cirkitdesigner.com/component/885af448-2bdb-49bc-ae1b-0e781522c801/hub75
+// ------------------------------------------------------------------------
+
+
 
 // assigning GPIOs to data cable ports for adafruit display ---> adjust numbers as needed
-#define R1 10 // red data for top half
-#define G1 11 // green data for top half
-#define B1 12 // blue data for top half
-#define R2 13 // red data for bottom half
-#define G2 14 // green data for bottom half
-#define B2 15 // blue data for bottom half
-#define A 16 // row select bit 0
-#define B 17 // row select bit 1
-#define C 18 // row select bit 2
+#define R1 17 // red data for top half
+#define G1 22 // green data for top half
+#define B1 16 // blue data for top half
+#define R2 15 // red data for bottom half
+#define G2 21 // green data for bottom half
+#define B2 14 // blue data for bottom half
+#define A 13 // row select bit 0
+#define B 20 // row select bit 1
+#define C 12 // row select bit 2
 #define D 19 // row select bit 3
-#define E 20 // row select bit 4
-#define CLK 21 // clock (shift register)
-#define LAT 22 // stores shifted data into output register --> latch
-#define OE 23 // active low output enable
+#define CLK 11 // clock (shift register)
+#define LAT 18 // stores shifted data into output register --> latch
+#define OE 10 // active low output enable
 
 // panel dimensions
 #define PANEL_WIDTH 64
 #define PANEL_HEIGHT 64
 #define PANEL_ROWS 32 // # of row addresses (scans 32 times to cover all 64 physical rows by scanning upper half and lower half)
 
-#define GPIO_MASK ((1u<<R1) | (1u<<G1) | (1u<<B1) | (1u<<R2) | (1u<<G2) | (1u<<B2) | (1u<<A) | (1u<<B) | (1u<<C) | (1u<<D) | (1u<<E) | (1u<<CLK) | (1u<<LAT) | (1u<<OE))
+#define GPIO_MASK ((1u<<R1) | (1u<<G1) | (1u<<B1) | (1u<<R2) | (1u<<G2) | (1u<<B2) | (1u<<A) | (1u<<B) | (1u<<C) | (1u<<D) | (1u<<CLK) | (1u<<LAT) | (1u<<OE))
 
 
 // https://github.com/hzeller/rpi-rgb-led-matrix
@@ -46,8 +57,8 @@ int dma_chan;
 // init gpio pins for all display pins
 void display_init()
 {
-    int pins[] = {R1, G1, B1, R2, G2, B2, A, B, C, D, E, CLK, LAT, OE};
-    for (int i = 0; i < 14; i++)
+    int pins[] = {R1, G1, B1, R2, G2, B2, A, B, C, D, CLK, LAT, OE};
+    for (int i = 0; i < 13; i++)
     {
         gpio_init(pins[i]);
         gpio_set_dir(pins[i], GPIO_OUT);
@@ -61,14 +72,13 @@ void display_init()
 }
 
 // selects waht row of hte display to update
-// row 0 is 00000, row 1 is 00001...row 64 is 11111, LSB so EDCBA
+// row 0 is 00000, row 1 is 00001...row 64 is 11111, LSB so DCBA
 void send_row(uint8_t row) 
 {
     gpio_put(A, row & 1);
     gpio_put(B, (row >> 1) & 1);
     gpio_put(C, (row >> 2) & 1);
     gpio_put(D, (row >> 3) & 1);
-    gpio_put(E, (row >> 4) & 1);
 
 }
 
@@ -86,7 +96,6 @@ void prepare_row_data(uint8_t row, uint8_t bit_plane)
     row_bits |= ((row >> 1) & 1) ? (1u << B) : 0;
     row_bits |= ((row >> 2) & 1) ? (1u << C) : 0;
     row_bits |= ((row >> 3) & 1) ? (1u << D) : 0;
-    row_bits |= ((row >> 4) & 1) ? (1u << E) : 0;
     base_state |= row_bits;
 
     for (int col = 0; col < PANEL_WIDTH; col++) // building pixel data for each column
