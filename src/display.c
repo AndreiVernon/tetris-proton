@@ -36,22 +36,11 @@
 #define LAT 18 // stores shifted data into output register --> latch
 #define OE 10 // active low output enable
 
-// panel dimensions
-#define PANEL_WIDTH 64
-#define PANEL_HEIGHT 64
-#define PANEL_ROWS 32 // # of row addresses (scans 32 times to cover all 64 physical rows by scanning upper half and lower half)
-
 #define GPIO_MASK ((1u<<R1) | (1u<<G1) | (1u<<B1) | (1u<<R2) | (1u<<G2) | (1u<<B2) | (1u<<A) | (1u<<B) | (1u<<C) | (1u<<D) | (1u<<E) | (1u<<CLK) | (1u<<LAT) | (1u<<OE))
 
 
 // https://github.com/hzeller/rpi-rgb-led-matrix
 
-<<<<<<< Updated upstream
-=======
-// framebuffer [row][col][rgb] 0 3d array that stores what to display
-uint8_t framebuffer[PANEL_HEIGHT][PANEL_WIDTH][3]; //change to uint8_t???
-
->>>>>>> Stashed changes
 // volatile uint32_t dma_buffer[PANEL_WIDTH * 2] __attribute__((aligned(4)));
 uint32_t dma_buffer[PANEL_WIDTH * 2]; // double buffer width
 int dma_chan;
@@ -74,7 +63,7 @@ void display_init()
     sleep_ms(10);
 }
 
-// selects waht row of hte display to update
+// selects which row of the display to update
 // row 0 is 00000, row 1 is 00001...row 64 is 11111, LSB so EDCBA
 void send_row(uint8_t row) 
 {
@@ -83,8 +72,6 @@ void send_row(uint8_t row)
     gpio_put(C, (row >> 2) & 1);
     gpio_put(D, (row >> 3) & 1);
     gpio_put(E, (row >> 4) & 1);
-
-
 }
 
 // prepare DMA buffer by adding all the GPIO states needed to make one complete row
@@ -93,7 +80,6 @@ void prepare_row_data(uint8_t row, uint8_t bit_plane)
     uint32_t base_state = sio_hw->gpio_out & ~GPIO_MASK; // preserves non display pins, 0's where display pins are
 
     base_state |= (1u << OE); // makes OE stay high (disabled) while shifting
-
 
     // converts row number to binary and adds to base state
     uint32_t row_bits = 0;
@@ -109,15 +95,21 @@ void prepare_row_data(uint8_t row, uint8_t bit_plane)
     {
         uint32_t pixel_bits = 0;
         
-        // upper half (rows 0-31)
-        uint8_t r1 = framebuffer[row][col][0];
-        uint8_t g1 = framebuffer[row][col][1];
-        uint8_t b1 = framebuffer[row][col][2];
+        // FLIPPED: Map physical display rows to framebuffer rows
+        // Physical top half (rows 0-31) maps to framebuffer rows 63-32
+        // Physical lower half (rows 32-63) maps to framebuffer rows 31-0
+        uint8_t fb_row_upper = 63 - row;      // upper half inverted
+        uint8_t fb_row_lower = 31 - row;      // lower half inverted
         
-        // lower half (rows 32-63)
-        uint8_t r2 = framebuffer[row + 32][col][0];
-        uint8_t g2 = framebuffer[row + 32][col][1];
-        uint8_t b2 = framebuffer[row + 32][col][2];
+        // upper half (physical rows 0-31, framebuffer rows 63-32)
+        uint8_t r1 = framebuffer[fb_row_upper][col][0];
+        uint8_t g1 = framebuffer[fb_row_upper][col][1];
+        uint8_t b1 = framebuffer[fb_row_upper][col][2];
+        
+        // lower half (physical rows 32-63, framebuffer rows 31-0)
+        uint8_t r2 = framebuffer[fb_row_lower][col][0];
+        uint8_t g2 = framebuffer[fb_row_lower][col][1];
+        uint8_t b2 = framebuffer[fb_row_lower][col][2];
         
         // implementing bit plane modulation (brightness manipulation)
         // if bit plane = 0, threshold = 128 (MSB)
@@ -181,7 +173,7 @@ void send_row_dma(uint8_t row, uint8_t bit_plane)
     gpio_put(OE, 0);
     sleep_us(50 >> bit_plane);    // bit plane timing: more significant bits stay on longer, brightness control
     gpio_put(OE, 1); // disables output
-    }
+}
 
 // scans through all rows and bit plans to show full image
 void display_refresh()
@@ -249,24 +241,23 @@ void display_draw_rect(uint8_t x, uint8_t y, uint8_t w, uint8_t h, uint8_t r, ui
 void display_test_pattern()
 {
     // quadrant test
-    display_draw_rect(0, 0, 32, 32, 255, 0, 0); // red top left
-    display_draw_rect(32, 0, 32, 32, 0, 255, 0); // green top right
-    display_draw_rect(0, 32, 32, 32, 0, 0, 255); // blue bottom left
-    display_draw_rect(32, 32, 32, 32, 255, 255, 0); // yellow bottom right
+    display_draw_rect(0, 0, 32, 32, 255, 0, 0);     // red bottom left
+    display_draw_rect(32, 0, 32, 32, 0, 255, 0);    // green bottom right
+    display_draw_rect(0, 32, 32, 32, 0, 0, 255);    // blue top left
+    display_draw_rect(32, 32, 32, 32, 255, 255, 0); // yellow top right
     
     // white border
     for (int i = 0; i < PANEL_WIDTH; i++) 
     {
-        display_set_pixel(i, 0, 255, 255, 255);
-        display_set_pixel(i, PANEL_HEIGHT-1, 255, 255, 255);
+        display_set_pixel(i, 0, 255, 255, 255);              // bottom edge
+        display_set_pixel(i, PANEL_HEIGHT-1, 255, 255, 255); // top edge
     }
     for (int i = 0; i < PANEL_HEIGHT; i++) 
     {
-        display_set_pixel(0, i, 255, 255, 255);
-        display_set_pixel(PANEL_WIDTH-1, i, 255, 255, 255);
+        display_set_pixel(0, i, 255, 255, 255);              // left edge
+        display_set_pixel(PANEL_WIDTH-1, i, 255, 255, 255);  // right edge
     }
 }
-
 
 
 int main()
