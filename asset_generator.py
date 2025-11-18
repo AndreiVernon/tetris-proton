@@ -24,8 +24,8 @@ if (w, h) != (64, 64):
 
 pixels = img.load()
 
-print("uint8_t bg[64][64][3] = {")
-for y in range(64):
+print("uint8_t background[64][64][3] = {")
+for y in range(63, -1, -1):
     row_tokens = []
     for x in range(64):
         rgb = pixels[x, y]

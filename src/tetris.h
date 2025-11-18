@@ -30,7 +30,7 @@ bool game_over = false;
 
 Piece piece;        //currently active piece
 Piece ghost_piece;        //ghost piece / shadow of active piece
-int held_piece = -1;        //shape of held piece
+int held_piece_shape = -1;        //shape of held piece
 bool hold_avail = true;     //can hold piece
 int rand_bag[14];           //bag of upcoming pieces
 int rand_bag_loc;           //index of bag

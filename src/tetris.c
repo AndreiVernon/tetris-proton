@@ -251,8 +251,8 @@ void hold_piece() {
     if (!hold_avail) return;
     else hold_avail = false;
 
-    int temp = held_piece;
-    held_piece = piece.shape;
+    int temp = held_piece_shape;
+    held_piece_shape = piece.shape;
 
     //if originally held piece is -1 (empty), new piece will come from bag
     new_piece(temp);

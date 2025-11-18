@@ -6,7 +6,7 @@
 #include "tetris.h"
 
 #define MATRIX_OFFSET_X 11  //how many px from left pieces are drawn
-#define MATRIX_OFFSET_Y 45  //how many px from bottom pieces are drawn
+#define MATRIX_OFFSET_Y 18  //how many px from bottom pieces are drawn
 
 int cur_frame = 0;          //current frame in 1 sec loop
 int second_start_time;      //where the current 1 sec loop starts
@@ -88,11 +88,17 @@ void render_matrix() {
         for (int x = 0; x < M_WIDTH; x++) {
             if (matrix[y][x] == EMPTY) continue;
 
+            int frame_y = MATRIX_OFFSET_Y + y * 2;
+            int frame_x = MATRIX_OFFSET_X + x * 2;
+
+            if (frame_y >= PANEL_HEIGHT || frame_x >= PANEL_WIDTH) continue;
+            // || frame_y < 0 || frame_x < 0
+
             //draw 4 pixels per block
-            set_block_color(framebuffer[MATRIX_OFFSET_Y + y * 2][MATRIX_OFFSET_X + x * 2], matrix[y][x], true);
-            set_block_color(framebuffer[MATRIX_OFFSET_Y + y * 2][MATRIX_OFFSET_X + x * 2 + 1], matrix[y][x], true);
-            set_block_color(framebuffer[MATRIX_OFFSET_Y + y * 2 + 1][MATRIX_OFFSET_X + x * 2], matrix[y][x], true);
-            set_block_color(framebuffer[MATRIX_OFFSET_Y + y * 2 + 1][MATRIX_OFFSET_X + x * 2 + 1], matrix[y][x], true);
+            set_block_color(framebuffer[frame_y][frame_x], matrix[y][x], true);
+            set_block_color(framebuffer[frame_y][frame_x + 1], matrix[y][x], true);
+            set_block_color(framebuffer[frame_y + 1][frame_x], matrix[y][x], true);
+            set_block_color(framebuffer[frame_y + 1][frame_x + 1], matrix[y][x], true);
         }
     }
 }
@@ -105,13 +111,32 @@ void render_piece(Piece cur_piece) {
         for (int x = 0; x < cur_piece.size; x++) {
             if (!cur_piece.mask[y * cur_piece.size + x]) continue;
 
+            int frame_y = MATRIX_OFFSET_Y + (y + cur_piece.y) * 2;
+            int frame_x = MATRIX_OFFSET_X + (x + cur_piece.x) * 2;
+
+            if (frame_y >= PANEL_HEIGHT || frame_x >= PANEL_WIDTH) continue;
+            // || frame_y < 0 || frame_x < 0
+
             //draw 4 pixels per block
-            memcpy(framebuffer[MATRIX_OFFSET_Y + (y + cur_piece.y) * 2][MATRIX_OFFSET_X + (x + cur_piece.x) * 2], col, 3);
-            memcpy(framebuffer[MATRIX_OFFSET_Y + (y + cur_piece.y) * 2][MATRIX_OFFSET_X + (x + cur_piece.x) * 2 + 1], col, 3);
-            memcpy(framebuffer[MATRIX_OFFSET_Y + (y + cur_piece.y) * 2 + 1][MATRIX_OFFSET_X + (x + cur_piece.x) * 2], col, 3);
-            memcpy(framebuffer[MATRIX_OFFSET_Y + (y + cur_piece.y) * 2 + 1][MATRIX_OFFSET_X + (x + cur_piece.x) * 2 + 1], col, 3);
+            memcpy(framebuffer[frame_y][frame_x], col, 3);
+            memcpy(framebuffer[frame_y][frame_x + 1], col, 3);
+            memcpy(framebuffer[frame_y + 1][frame_x], col, 3);
+            memcpy(framebuffer[frame_y + 1][frame_x + 1], col, 3);
         }
     }
+}
+
+//incomplete
+void render_hold() {
+    if (held_piece_shape == -1) return;
+
+    Piece held_piece = {
+        .shape = held_piece_shape,
+    };
+}
+
+void render_next() {
+
 }
 
 void render_tetris() {
@@ -119,9 +144,9 @@ void render_tetris() {
     render_matrix();
     render_piece(ghost_piece);
     render_piece(piece);
-    // render_clear();
-    // render_next();
-    // render_hold();
+    // render_clear_line();
+    render_hold();
+    render_next();
     // render_score();
     // render_time();
 }
