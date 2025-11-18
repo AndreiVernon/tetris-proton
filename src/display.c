@@ -2,6 +2,7 @@
 #include "hardware/dma.h"
 #include "hardware/gpio.h"
 #include <string.h>
+#include "display.h"
 
 // 64x64 RGB LED Matrix - 3mm Pitch - 192mm x 192mm; Product ID: 4732
 // https://www.adafruit.com/product/4732
@@ -36,18 +37,10 @@
 #define LAT 18 // stores shifted data into output register --> latch
 #define OE 10 // active low output enable
 
-// panel dimensions
-#define PANEL_WIDTH 64
-#define PANEL_HEIGHT 64
-#define PANEL_ROWS 32 // # of row addresses (scans 32 times to cover all 64 physical rows by scanning upper half and lower half)
-
 #define GPIO_MASK ((1u<<R1) | (1u<<G1) | (1u<<B1) | (1u<<R2) | (1u<<G2) | (1u<<B2) | (1u<<A) | (1u<<B) | (1u<<C) | (1u<<D) | (1u<<CLK) | (1u<<LAT) | (1u<<OE))
 
 
 // https://github.com/hzeller/rpi-rgb-led-matrix
-
-// framebuffer [row][col][rgb] 0 3d array that stores what to display
-uint32_t framebuffer[PANEL_HEIGHT][PANEL_WIDTH][3];
 
 // volatile uint32_t dma_buffer[PANEL_WIDTH * 2] __attribute__((aligned(4)));
 uint32_t dma_buffer[PANEL_WIDTH * 2]; // double buffer width
