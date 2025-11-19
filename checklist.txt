@@ -61,15 +61,17 @@ Graphics:
 X-frame timing
 -render menus
 --option cycling and moving between options
--render static game elements
---arena, "hold", "next", score, time
---garbage progress bar?
--render pieces for hold and next
--render pieces in playfield matrix
--render active piece
--render ghost piece
---disabled when no active piece
---use hard drop function to get new position
+--score and time in-game
+X-render static game elements
+X--arena, "hold", "next"
+-garbage progress bar?
+X-render pieces for hold
+X-render pieces for next
+X-render pieces in playfield matrix
+X-render active piece
+X-render ghost piece
+X--disabled when no active piece
+X--use hard drop function to get new position
 -VFX?
 
 Text:

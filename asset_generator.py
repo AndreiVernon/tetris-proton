@@ -10,6 +10,7 @@ IMAGE_PATH = "mockup_asset_gen.png"
 COLOR_MAP = {
     (0, 0, 0): "K",              # black
     (255, 255, 255): "Y",    # white
+    (63, 63, 63): "DARK_GREY"
 }
 
 # Default token for unmatched pixels

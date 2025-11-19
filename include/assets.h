@@ -82,11 +82,11 @@ uint8_t background[64][64][3] = {
     {K, K, K, K, K, K, K, K, K, K, Y, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, Y, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K},
     {K, K, K, K, K, K, K, K, K, K, Y, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, Y, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K},
     {K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, Y, K, Y, K, Y, Y, Y, K, Y, Y, Y, K, Y, Y, K, K, K, K, K, K, K, K, K, K},
-    {K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, Y, Y, Y, K, Y, K, Y, K, Y, K, K, K, Y, K, Y, K, K, K, K, K, K, K, K, K},
+    {K, K, K, K, K, K, K, K, K, K, DARK_GREY, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, DARK_GREY, K, K, K, K, K, K, K, K, Y, Y, Y, K, Y, K, Y, K, Y, K, K, K, Y, K, Y, K, K, K, K, K, K, K, K, K},
     {K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, Y, K, Y, K, Y, K, Y, K, Y, K, K, K, Y, K, Y, K, K, K, K, K, K, K, K, K},
-    {K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, Y, K, Y, K, Y, Y, Y, K, Y, K, K, K, Y, Y, K, K, K, K, K, K, K, K, K, K},
+    {K, K, K, K, K, K, K, K, K, K, DARK_GREY, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, DARK_GREY, K, K, K, K, K, K, K, K, Y, K, Y, K, Y, Y, Y, K, Y, K, K, K, Y, Y, K, K, K, K, K, K, K, K, K, K},
     {K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K},
-    {K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K},
-}
+    {K, K, K, K, K, K, K, K, K, K, DARK_GREY, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, DARK_GREY, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K},
+};
 
 #endif

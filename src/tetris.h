@@ -28,12 +28,24 @@ uint8_t matrix[M_HEIGHT][M_WIDTH];
 uint32_t score = 0;
 bool game_over = false;
 
-Piece piece;        //currently active piece
+Piece active_piece;        //currently active piece
 Piece ghost_piece;        //ghost piece / shadow of active piece
 int held_piece_shape = -1;        //shape of held piece
 bool hold_avail = true;     //can hold piece
 int rand_bag[14];           //bag of upcoming pieces
 int rand_bag_loc;           //index of bag
+
+const int piece_mask_sizes[7] = {5, 3, 3, 3, 3, 3, 3};
+//from bottom left to top right
+const uint8_t piece_masks[7][25] = {
+    {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},  // I (0)
+    {0, 0, 0, 0, 1, 1, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},  // O (1)
+    {0, 0, 0, 1, 1, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},  // S (2)
+    {0, 0, 0, 0, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},  // Z (3)
+    {0, 0, 0, 1, 1, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},  // T (4)
+    {0, 0, 0, 1, 1, 1, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},  // L (5)
+    {0, 0, 0, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}   // J (6)
+};  //      ||       ||       || (3x3)
 
 int game_loop();
 
