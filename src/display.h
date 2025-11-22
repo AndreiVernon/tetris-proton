@@ -11,4 +11,6 @@
 // framebuffer[row][col][rgb] - 3d array that stores what to display
 uint8_t framebuffer[PANEL_HEIGHT][PANEL_WIDTH][3];
 
+void display_loop();
+
 #endif

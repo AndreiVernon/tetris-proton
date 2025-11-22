@@ -8,6 +8,8 @@
 #define MATRIX_OFFSET_X 11  //how many px from left pieces are drawn
 #define MATRIX_OFFSET_Y 18  //how many px from bottom pieces are drawn
 
+volatile bool frame_ready = false;   //frame ready to display
+
 int cur_frame = 0;          //current frame in 1 sec loop
 int second_start_time;      //where the current 1 sec loop starts
 
@@ -40,7 +42,7 @@ void render_menu() {
 }
 
 void render_background() {
-    memcpy(framebuffer, background, sizeof(framebuffer) * PANEL_WIDTH * PANEL_HEIGHT * 3);
+    memcpy(framebuffer, background, sizeof(framebuffer));
 }
 
 void set_block_color(uint8_t *arr, uint8_t px, bool dim) {

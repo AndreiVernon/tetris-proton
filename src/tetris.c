@@ -7,29 +7,103 @@
 #include "tetris.h"
 #include "graphics.h"
 
+uint8_t matrix[M_HEIGHT][M_WIDTH] = {0};
+uint32_t score = 0;
+volatile bool game_over = false;
+Piece active_piece = {0};        //currently active piece
+Piece ghost_piece = {0};        //ghost piece / shadow of active piece
+int held_piece_shape = -1;        //shape of held piece
+bool hold_avail = true;     //can hold piece
+int rand_bag[14] = {0};           //bag of upcoming pieces
+int rand_bag_loc = 0;           //index of bag
 
-int game_loop() {
-    //clear playfield
-    memset(matrix, EMPTY, sizeof(uint8_t) * M_HEIGHT * M_WIDTH);
-    active_piece.shape = -1;
-    
-    //set up bag
-    gen_rand_bag(false);
-    gen_rand_bag(true);
+const int piece_mask_sizes[7] = {5, 2, 3, 3, 3, 3, 3};
+//from bottom left to top right
+const uint8_t piece_masks[7][25] = {
+    {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},  // I (0)
+    {1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},  // O (1)
+    {0, 0, 0, 1, 1, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},  // S (2)
+    {0, 0, 0, 0, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},  // Z (3)
+    {0, 0, 0, 1, 1, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},  // T (4)
+    {0, 0, 0, 1, 1, 1, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},  // L (5)
+    {0, 0, 0, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}   // J (6)
+};  //      ||       ||       || (3x3)
 
-    //game start animation here
+//check if current piece is colliding with blocks on playfield
+//returns true if colliding or out of bounds
+bool is_colliding() {
+    for (int y = 0; y < active_piece.size; y++) {
+        for (int x = 0; x < active_piece.size; x++) {
+            //check every active block in piece mask
+            if (active_piece.mask[y * active_piece.size + x]) {
+                //check for oob
+                if (active_piece.x + x < 0 || active_piece.x + x >= M_WIDTH || active_piece.y + y < 0 || active_piece.y + y >= M_HEIGHT)
+                    return true;
 
-    new_piece(-1);
-
-    while (!game_over) {
-        //process_inputs here
-
-        //render_frame here
-        while (!frame_ready) tight_loop_contents();
-        //display_frame here (set frame ready to false at start of this func)
+                //check for collision
+                if (matrix[active_piece.y + y][active_piece.x + x] != EMPTY)
+                    return true;
+            }
+        }
     }
 
-    return 0;
+    return false;
+}
+
+//locks location of the piece and adds to playfield
+void lock_piece() {
+    for (int y = 0; y < active_piece.size; y++) {
+        for (int x = 0; x < active_piece.size; x++) {
+            if (active_piece.mask[y * active_piece.size + x]) {
+                matrix[active_piece.y + y][active_piece.x + x] = active_piece.shape;
+            }
+        }
+    }
+
+    //game over check
+    //only game over if every block in piece is oob
+    if (active_piece.y >= 20 - active_piece.size) {
+        bool oob = true;
+
+        for (int y = 0; y < active_piece.size; y++) {
+            for (int x = 0; x < active_piece.size; x++) {
+                if (active_piece.mask[y * active_piece.size + x]) {
+                    if (active_piece.y + y < 20) {
+                        oob = false;
+                        goto nested_break;
+                    }
+                }
+            }
+        }
+        nested_break:
+
+        if (oob) game_over = true;
+    }
+}
+
+//generates random bag of tetriminos
+void gen_rand_bag(bool second_half) {
+    int *arr = &rand_bag[second_half ? 7 : 0];
+
+    //fill array with numbers 0-6
+    for (int i = 0; i < 7; i++)
+        arr[i] = i;
+
+    //Fisher-Yates shuffle (uniform sampling)
+    for (int i = 6; i > 0; i--) {
+        int j;
+        int limit = UINT32_MAX - (UINT32_MAX % (i + 1));
+
+        do {
+            j = rand();
+        } while (j >= limit);
+
+        j %= (i + 1);
+
+        int temp = arr[i];
+        arr[i] = arr[j];
+        arr[j] = temp;
+    }
 }
 
 //place new tetrimino
@@ -71,31 +145,6 @@ void new_piece(int new_shape) {
 
     //game over check
     game_over = is_colliding();
-}
-
-//generates random bag of tetriminos
-void gen_rand_bag(bool second_half) {
-    int *arr = &rand_bag[second_half ? 7 : 0];
-
-    //fill array with numbers 0-6
-    for (int i = 0; i < 7; i++)
-        arr[i] = i;
-
-    //Fisher-Yates shuffle (uniform sampling)
-    for (int i = 6; i > 0; i--) {
-        int j;
-        int limit = UINT32_MAX - (UINT32_MAX % (i + 1));
-
-        do {
-            j = rand();
-        } while (j >= limit);
-
-        j %= (i + 1);
-
-        int temp = arr[i];
-        arr[i] = arr[j];
-        arr[j] = temp;
-    }
 }
 
 //move piece left or right
@@ -210,13 +259,6 @@ void soft_drop() {
     if (is_colliding()) active_piece.y++;
 }
 
-//update ghost piece
-void update_ghost() {
-    ghost_piece = active_piece;
-    ghost_piece.shape = GHOST;
-    hard_drop(true);
-}
-
 //drop piece instantly
 void hard_drop(bool ghost) {
     Piece* piece_sel = ghost ? &ghost_piece : &active_piece;
@@ -228,6 +270,13 @@ void hard_drop(bool ghost) {
     }
 
     if (!ghost) lock_piece();
+}
+
+//update ghost piece
+void update_ghost() {
+    ghost_piece = active_piece;
+    ghost_piece.shape = GHOST;
+    hard_drop(true);
 }
 
 void do_gravity() {
@@ -245,58 +294,6 @@ void hold_piece() {
     //if originally held piece is -1 (empty), new piece will come from bag
     new_piece(temp);
     return;
-}
-
-//check if current piece is colliding with blocks on playfield
-//returns true if colliding or out of bounds
-bool is_colliding() {
-    for (int y = 0; y < active_piece.size; y++) {
-        for (int x = 0; x < active_piece.size; x++) {
-            //check every active block in piece mask
-            if (active_piece.mask[y * active_piece.size + x]) {
-                //check for oob
-                if (active_piece.x + x < 0 || active_piece.x + x >= M_WIDTH || active_piece.y + y < 0 || active_piece.y + y >= M_HEIGHT)
-                    return true;
-
-                //check for collision
-                if (matrix[active_piece.y + y][active_piece.x + x] != EMPTY)
-                    return true;
-            }
-        }
-    }
-
-    return false;
-}
-
-//locks location of the piece and adds to playfield
-void lock_piece() {
-    for (int y = 0; y < active_piece.size; y++) {
-        for (int x = 0; x < active_piece.size; x++) {
-            if (active_piece.mask[y * active_piece.size + x]) {
-                matrix[active_piece.y + y][active_piece.x + x] = active_piece.shape;
-            }
-        }
-    }
-
-    //game over check
-    //only game over if every block in piece is oob
-    if (active_piece.y >= 20 - active_piece.size) {
-        bool oob = true;
-
-        for (int y = 0; y < active_piece.size; y++) {
-            for (int x = 0; x < active_piece.size; x++) {
-                if (active_piece.mask[y * active_piece.size + x]) {
-                    if (active_piece.y + y < 20) {
-                        oob = false;
-                        goto nested_break;
-                    }
-                }
-            }
-        }
-        nested_break:
-
-        if (oob) game_over = true;
-    }
 }
 
 //shifts every line above `row` by amount
@@ -336,6 +333,7 @@ void shift_lines(int row, int amount) {
         }
     }
     nested_break:
+    return;
 
 }
 
@@ -369,3 +367,27 @@ void add_garbage() {
 int coord_to_matrix(int x, int y) {
     return (M_HEIGHT - y - 1) * M_WIDTH + x;
 } */
+
+int game_loop() {
+    //clear playfield
+    memset(matrix, EMPTY, sizeof(matrix));
+    active_piece.shape = -1;
+    
+    //set up bag
+    gen_rand_bag(false);
+    gen_rand_bag(true);
+
+    //game start animation here
+
+    new_piece(-1);
+
+    while (!game_over) {
+        //process_inputs here
+
+        //render_frame here
+        while (!frame_ready) tight_loop_contents();
+        //display_frame here (set frame ready to false at start of this func)
+    }
+
+    return 0;
+}

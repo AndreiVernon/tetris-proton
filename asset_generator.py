@@ -8,9 +8,18 @@ IMAGE_PATH = "mockup_asset_gen.png"
 # Mapping: pixel_value → text_token
 # Pixel values must be 3-tuples of (R, G, B)
 COLOR_MAP = {
-    (0, 0, 0): "K",              # black
-    (255, 255, 255): "Y",    # white
-    (63, 63, 63): "DARK_GREY"
+    (0,   0,   0):   "K",           # BLACK
+    (255, 255, 255): "W",           # WHITE
+    (63,  63,  63):  "DGY",   # DARK GREY
+    # (249, 255, 178): "WW",   # WARM WHITE
+    # (0,   0, 255):   "DB",   # DARK_BLUE
+    # (0, 255, 255):   "LB",  # LIGHT_BLUE (cyan)
+    # (255, 0,   0):   "R",         # RED
+    # (255, 170, 0):   "O",      # ORANGE
+    # (255, 255, 0):   "Y",      # YELLOW
+    # (153, 0, 255):   "P",      # PURPLE
+    # (0, 255,   0):   "GR",       # GREEN
+    # (119, 50, 50):   "RU",        # RUST
 }
 
 # Default token for unmatched pixels

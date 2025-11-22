@@ -5,6 +5,6 @@
 
 #define TARGET_FRAMERATE 60
 
-bool frame_ready = false;   //frame ready to display
+extern volatile bool frame_ready;   //frame ready to display
 
 #endif

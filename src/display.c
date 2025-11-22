@@ -3,6 +3,7 @@
 #include "hardware/gpio.h"
 #include <string.h>
 #include "display.h"
+#include "assets.h"
 
 // 64x64 RGB LED Matrix - 3mm Pitch - 192mm x 192mm; Product ID: 4732
 // https://www.adafruit.com/product/4732
@@ -21,261 +22,190 @@
 // ------------------------------------------------------------------------
 
 // assigning GPIOs to data cable ports for adafruit display ---> adjust numbers as needed
-#define R1 17 // red data for top half
-#define G1 22 // green data for top half
-#define B1 16 // blue data for top half
-#define R2 15 // red data for bottom half
-#define G2 21 // green data for bottom half
-#define B2 14 // blue data for bottom half
-#define A 13 // row select bit 0
-#define B 20 // row select bit 1
-#define C 12 // row select bit 2
-#define D 19 // row select bit 3
-#define E 23 // row select bit 4
-#define CLK 11 // clock (shift register)
-#define LAT 18 // stores shifted data into output register --> latch
-#define OE 10 // active low output enable
+#define R1 16 // red data for top half
+#define G1 10 // green data for top half
+#define B1 17 // blue data for top half
+#define R2 18 // red data for bottom half
+#define G2 11 // green data for bottom half
+#define B2 19 // blue data for bottom half
+#define A 20 // row select bit 0
+#define B 13 // row select bit 1
+#define C 21 // row select bit 2
+#define D 14 // row select bit 3
+#define E 12 // row select bit 4
+#define CLK 22 // clock (shift register)
+#define LAT 15 // stores shifted data into output register --> latch
+#define OE 23 // active low output enable
 
 #define GPIO_MASK ((1u<<R1) | (1u<<G1) | (1u<<B1) | (1u<<R2) | (1u<<G2) | (1u<<B2) | (1u<<A) | (1u<<B) | (1u<<C) | (1u<<D) | (1u<<E) | (1u<<CLK) | (1u<<LAT) | (1u<<OE))
 
 
 // https://github.com/hzeller/rpi-rgb-led-matrix
 
-// volatile uint32_t dma_buffer[PANEL_WIDTH * 2] __attribute__((aligned(4)));
-uint32_t dma_buffer[PANEL_WIDTH * 2]; // double buffer width
-int dma_chan;
+// BCM configuration (tunable)
+#define BCM_BITS 6        // number of bit planes (3 => uses bits 7,6,5 of each color)
+#define LSB_TIME_US 1    // duration of LSB plane in microseconds (tweak if flicker)
 
+// masks for fast operations
+static const uint32_t DATA_MASK = (1u<<R1)|(1u<<G1)|(1u<<B1)|(1u<<R2)|(1u<<G2)|(1u<<B2);
+static const uint32_t ADDR_MASK = (1u<<A)|(1u<<B)|(1u<<C)|(1u<<D)|(1u<<E);
 
-// init gpio pins for all display pins
+// initialize GPIOs
 void display_init()
 {
     int pins[] = {R1, G1, B1, R2, G2, B2, A, B, C, D, E, CLK, LAT, OE};
-    for (int i = 0; i < 14; i++)
-    {
+    for (int i = 0; i < (int)(sizeof(pins)/sizeof(pins[0])); ++i) {
         gpio_init(pins[i]);
         gpio_set_dir(pins[i], GPIO_OUT);
         gpio_put(pins[i], 0);
     }
-    
-    gpio_put(OE, 1); // start with output disabled
-    memset(framebuffer, 0, sizeof(framebuffer)); // clear framebuffer
+    // ensure outputs disabled to start (OE is active low)
+    gpio_put(OE, 1);
+    gpio_put(LAT, 0);
+    gpio_put(CLK, 0);
 
+    // clear framebuffer if desired
+    memset(framebuffer, 0, sizeof(framebuffer));
     sleep_ms(10);
 }
 
-// selects which row of the display to update
-// row 0 is 00000, row 1 is 00001...row 64 is 11111, LSB so EDCBA
-void send_row(uint8_t row) 
+// set the row address lines A..E for a half-row index [0..31]
+static inline void send_row_address(uint8_t row)
 {
-    gpio_put(A, row & 1);
-    gpio_put(B, (row >> 1) & 1);
-    gpio_put(C, (row >> 2) & 1);
-    gpio_put(D, (row >> 3) & 1);
-    gpio_put(E, (row >> 4) & 1);
+    // produce mask for address lines (atomic)
+    uint32_t mask_set = 0;
+    if (row & 0x01) mask_set |= (1u<<A);
+    if (row & 0x02) mask_set |= (1u<<B);
+    if (row & 0x04) mask_set |= (1u<<C);
+    if (row & 0x08) mask_set |= (1u<<D);
+    if (row & 0x10) mask_set |= (1u<<E);
+
+    // clear address bits then set as needed
+    gpio_clr_mask(ADDR_MASK);
+    gpio_set_mask(mask_set);
 }
 
-// prepare DMA buffer by adding all the GPIO states needed to make one complete row
-void prepare_row_data(uint8_t row, uint8_t bit_plane) 
+// shift one half-row (64 columns) for given row and bit plane using bit-banging
+static void shift_row_bitplane(uint8_t row, uint8_t bit_plane)
 {
-    uint32_t base_state = sio_hw->gpio_out & ~GPIO_MASK; // preserves non display pins, 0's where display pins are
+    // we scan half-rows: top = row, bottom = row + 32
+    const uint8_t top_row = (PANEL_HEIGHT - 1) - row;
+    const uint8_t bot_row = (PANEL_HEIGHT/2 - 1) - row;
 
-    base_state |= (1u << OE); // makes OE stay high (disabled) while shifting
+    // choose which bit of each 8-bit channel to use
+    const int bit_index = 7 - bit_plane; // bit_plane 0 => MSB (bit 7)
 
-    // converts row number to binary and adds to base state
-    uint32_t row_bits = 0;
-    row_bits |= (row & 1) ? (1u << A) : 0;
-    row_bits |= ((row >> 1) & 1) ? (1u << B) : 0;
-    row_bits |= ((row >> 2) & 1) ? (1u << C) : 0;
-    row_bits |= ((row >> 3) & 1) ? (1u << D) : 0;
-    row_bits |= ((row >> 4) & 1) ? (1u << E) : 0;
-
-    base_state |= row_bits;
-
-    for (int col = 0; col < PANEL_WIDTH; col++) // building pixel data for each column
-    {
-        uint32_t pixel_bits = 0;
-        
-        // FLIPPED: Map physical display rows to framebuffer rows
-        // Physical top half (rows 0-31) maps to framebuffer rows 63-32
-        // Physical lower half (rows 32-63) maps to framebuffer rows 31-0
-        uint8_t fb_row_upper = 63 - row;      // upper half inverted
-        uint8_t fb_row_lower = 31 - row;      // lower half inverted
-        
-        // upper half (physical rows 0-31, framebuffer rows 63-32)
-        uint8_t r1 = framebuffer[fb_row_upper][col][0];
-        uint8_t g1 = framebuffer[fb_row_upper][col][1];
-        uint8_t b1 = framebuffer[fb_row_upper][col][2];
-        
-        // lower half (physical rows 32-63, framebuffer rows 31-0)
-        uint8_t r2 = framebuffer[fb_row_lower][col][0];
-        uint8_t g2 = framebuffer[fb_row_lower][col][1];
-        uint8_t b2 = framebuffer[fb_row_lower][col][2];
-        
-        // implementing bit plane modulation (brightness manipulation)
-        // if bit plane = 0, threshold = 128 (MSB)
-        // if bit plane = 1, threshold = 64
-        // if bit plane = 2, threshold = 32 (LSB)
-        // i.e., if red = 200 (binary is 11001000)
-            // bit plane 0: 200 > 128 --> true so LED on for 50 us
-            // bit plane 1: 200 > 64 --> true so LED on for 25 us
-            // bit plane 2: 200 > 32 --> true so LED on for 12.5 us
-        if (r1 > (128 >> bit_plane)) pixel_bits |= (1u << R1);
-        if (g1 > (128 >> bit_plane)) pixel_bits |= (1u << G1);
-        if (b1 > (128 >> bit_plane)) pixel_bits |= (1u << B1);
-        if (r2 > (128 >> bit_plane)) pixel_bits |= (1u << R2);
-        if (g2 > (128 >> bit_plane)) pixel_bits |= (1u << G2);
-        if (b2 > (128 >> bit_plane)) pixel_bits |= (1u << B2);
-        
-        // creating clock rising edges; each pixel needs clock pulse to shift into the matrix's registers
-        dma_buffer[col * 2] = base_state | pixel_bits;// stores CLK=0 state
-        dma_buffer[col * 2 + 1] = base_state | pixel_bits | (1u << CLK); // stpres CLK=1 state (same but with clock high)
-    }
-}
-
-void dma_init()
-{
-    dma_chan = dma_claim_unused_channel(true);
-    dma_channel_config c = dma_channel_get_default_config(dma_chan);
-    
-    channel_config_set_transfer_data_size(&c, DMA_SIZE_32); // 32
-    channel_config_set_read_increment(&c, true);
-    channel_config_set_write_increment(&c, false);
-
-    channel_config_set_dreq(&c, DREQ_FORCE); // goes as fast as possible
-
-    // write address (GPIO_OUT), read address dma pattern buffer, 128 transfers, don't start yet)
-    dma_channel_configure(dma_chan, &c, &sio_hw->gpio_out, dma_buffer, PANEL_WIDTH * 2, false);
-}
-
-
-// use DMA tos end one complete row of data to the display
-void send_row_dma(uint8_t row, uint8_t bit_plane) 
-{
-    // disables output while updating
+    // disable outputs while shifting
     gpio_put(OE, 1);
-    
-    // prepares DMA buffer with pixel data
-    prepare_row_data(row, bit_plane);
-    
-    // configures and start DMA transfer
-    dma_channel_set_read_addr(dma_chan, dma_buffer, false);
-    dma_channel_set_trans_count(dma_chan, PANEL_WIDTH * 2, true);  // transfers 128 values (64 pixels * 2 clock edges)
-    
-    // waits for DMA to finish
-    dma_channel_wait_for_finish_blocking(dma_chan);
-    
-    // latches the data
+
+    // set address lines for this row
+    send_row_address(row);
+
+    // For every column: set data lines (R1,G1,B1,R2,G2,B2) then pulse CLK
+    for (int col = 0; col < PANEL_WIDTH; ++col)
+    {
+        uint32_t set_mask = 0;
+        // top half pixel at (top_row, col)
+        uint8_t r1 = framebuffer[top_row][col][0];
+        uint8_t g1 = framebuffer[top_row][col][1];
+        uint8_t b1 = framebuffer[top_row][col][2];
+
+        // bottom half pixel at (bot_row, col)
+        uint8_t r2 = framebuffer[bot_row][col][0];
+        uint8_t g2 = framebuffer[bot_row][col][1];
+        uint8_t b2 = framebuffer[bot_row][col][2];
+
+        if (r1 & (1u << bit_index)) set_mask |= (1u << R1);
+        if (g1 & (1u << bit_index)) set_mask |= (1u << G1);
+        if (b1 & (1u << bit_index)) set_mask |= (1u << B1);
+
+        if (r2 & (1u << bit_index)) set_mask |= (1u << R2);
+        if (g2 & (1u << bit_index)) set_mask |= (1u << G2);
+        if (b2 & (1u << bit_index)) set_mask |= (1u << B2);
+
+        // write the data lines atomically: clear then set
+        gpio_clr_mask(DATA_MASK);
+        if (set_mask) gpio_set_mask(set_mask);
+
+        // pulse clock: rising edge shifts the data into the panel's shift registers
+        gpio_put(CLK, 1);
+        gpio_put(CLK, 0);
+    }
+
+    // after shifting all columns, latch the row data into outputs
     gpio_put(LAT, 1);
+    // short hold to meet panel latch timings
     sleep_us(1);
     gpio_put(LAT, 0);
-    
-    //display for appropriate duration
+
+    // compute display time weight for this bit plane (LSB -> shortest)
+    uint32_t weight_us = (uint32_t)LSB_TIME_US << (BCM_BITS - 1 - bit_plane);
+
+    // enable outputs for that duration
     gpio_put(OE, 0);
-    sleep_us(50 >> bit_plane);    // bit plane timing: more significant bits stay on longer, brightness control
-    gpio_put(OE, 1); // disables output
+    sleep_us(weight_us);
+    gpio_put(OE, 1);
 }
 
-// scans through all rows and bit plans to show full image
+// top-level refresh: iterate over bitplanes, then half-rows 0..31
 void display_refresh()
 {
-    // Scan all rows with bit-plane modulation for brightness
-    for (uint8_t bit_plane = 0; bit_plane < 3; bit_plane++) // 3 bit planes, 2^3 brightness levels per color channel
+    // For each bit-plane (MSB first)
+    for (uint8_t bit_plane = 0; bit_plane < BCM_BITS; ++bit_plane)
     {
-        for (uint8_t row = 0; row < PANEL_ROWS; row++)  // 64 rows covered
+        // scan half-rows (0..(PANEL_HEIGHT/2 - 1))
+        for (uint8_t row = 0; row < (PANEL_HEIGHT / 2); ++row)
         {
-            send_row_dma(row, bit_plane);
+            shift_row_bitplane(row, bit_plane);
         }
     }
 }
 
-// sets a pixel in the framebuffer
-// takes (x,y) coordinates with rgb values and stores into framebuffer array
-// basically, allows each entire image to be built first before getting displayed
+// pixel helpers
 void display_set_pixel(uint8_t x, uint8_t y, uint8_t r, uint8_t g, uint8_t b)
 {
-    if (x >= PANEL_WIDTH || y >= PANEL_HEIGHT) 
-    {
-        return;
-    }
-
+    if (x >= PANEL_WIDTH || y >= PANEL_HEIGHT) return;
     framebuffer[y][x][0] = r;
     framebuffer[y][x][1] = g;
     framebuffer[y][x][2] = b;
 }
 
-
-//////////////////////////////// helper functions
-// clears the display
 void display_clear()
 {
     memset(framebuffer, 0, sizeof(framebuffer));
 }
 
-// fills entire screen with solid color
 void display_fill(uint8_t r, uint8_t g, uint8_t b)
 {
-    for (int y = 0; y < PANEL_HEIGHT; y++) 
-    {
-        for (int x = 0; x < PANEL_WIDTH; x++) 
-        {
-            framebuffer[y][x][0] = r;
-            framebuffer[y][x][1] = g;
-            framebuffer[y][x][2] = b;
-        }
-    }
+    for (int y = 0; y < PANEL_HEIGHT; ++y)
+        for (int x = 0; x < PANEL_WIDTH; ++x)
+            display_set_pixel(x, y, r, g, b);
 }
 
-// draw a filled rectangle, maybe used for tetris blocks
-void display_draw_rect(uint8_t x, uint8_t y, uint8_t w, uint8_t h, uint8_t r, uint8_t g, uint8_t b)
-{
-    for (uint8_t dy = 0; dy < h; dy++) 
-    {
-        for (uint8_t dx = 0; dx < w; dx++) 
-        {
-            display_set_pixel(x + dx, y + dy, r, g, b);
-        }
-    }
-}
-
-// test pattern
+// example test pattern (kept / adjusted)
 void display_test_pattern()
 {
-    // quadrant test
-    display_draw_rect(0, 0, 32, 32, 255, 0, 0);     // red bottom left
-    display_draw_rect(32, 0, 32, 32, 0, 255, 0);    // green bottom right
-    display_draw_rect(0, 32, 32, 32, 0, 0, 255);    // blue top left
-    display_draw_rect(32, 32, 32, 32, 255, 255, 0); // yellow top right
-    
-    // white border
-    for (int i = 0; i < PANEL_WIDTH; i++) 
-    {
-        display_set_pixel(i, 0, 255, 255, 255);              // bottom edge
-        display_set_pixel(i, PANEL_HEIGHT-1, 255, 255, 255); // top edge
+    display_fill(0,0,0);
+    // quadrants using framebuffer coordinates where (0,0) is top-left here
+    for (int y = 0; y < 32; ++y) {
+        for (int x = 0; x < 32; ++x) display_set_pixel(x, y, 255, 0, 0);        // top-left red
+        for (int x = 32; x < 64; ++x) display_set_pixel(x, y, 0, 255, 0);       // top-right green
     }
-    for (int i = 0; i < PANEL_HEIGHT; i++) 
-    {
-        display_set_pixel(0, i, 255, 255, 255);              // left edge
-        display_set_pixel(PANEL_WIDTH-1, i, 255, 255, 255);  // right edge
+    for (int y = 32; y < 64; ++y) {
+        for (int x = 0; x < 32; ++x) display_set_pixel(x, y, 0, 0, 255);        // bottom-left blue
+        for (int x = 32; x < 64; ++x) display_set_pixel(x, y, 255, 255, 0);    // bottom-right yellow
     }
 }
 
-
-int main()
-{
+void display_loop() {
     stdio_init_all();
-    
     display_init();
-    dma_init();
-    
-    // test pattern
-    display_test_pattern();
-    
-    // continuously refresh display
-    while (1) 
-    {
-        display_refresh();
-    }
-    
-    return 0;
 
+    // Ensure background/asset copy size is correct:
+    memcpy(framebuffer, background, sizeof(framebuffer)); // background must match framebuffer size
+
+    while (1) {
+        display_refresh();
+        // do other non-blocking tasks here if needed
+    }
 }
