@@ -1,21 +1,27 @@
 #include <stdio.h>
 #include <math.h>
-#include <stdlib.h>
 #include <string.h>
 #include "pico/stdlib.h"
 #include "pico/rand.h"
 #include "tetris.h"
 #include "graphics.h"
 
+#define GENERATION_TIME 0.2  //in s
+
 uint8_t matrix[M_HEIGHT][M_WIDTH] = {0};
 uint32_t score = 0;
 volatile bool game_over = false;
-Piece active_piece = {0};        //currently active piece
+Piece active_piece = {0};       //currently active piece
 Piece ghost_piece = {0};        //ghost piece / shadow of active piece
-int held_piece_shape = -1;        //shape of held piece
-bool hold_avail = true;     //can hold piece
-int rand_bag[14] = {0};           //bag of upcoming pieces
+int held_piece_shape = -1;      //shape of held piece
+bool hold_avail = true;         //can hold piece
+int rand_bag[14] = {0};         //bag of upcoming pieces
 int rand_bag_loc = 0;           //index of bag
+GamePhase cur_phase = GENERATION;
+
+int frame_timer;
+int generation_timer_flag = -1;     //-1 = not armed, 0 = armed, 1 = fired
+repeating_timer_t generation_timer = {0};
 
 const int piece_mask_sizes[7] = {5, 2, 3, 3, 3, 3, 3};
 //from bottom left to top right
@@ -28,6 +34,62 @@ const uint8_t piece_masks[7][25] = {
     {0, 0, 0, 1, 1, 1, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},  // L (5)
     {0, 0, 0, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}   // J (6)
 };  //      ||       ||       || (3x3)
+
+const int8_t rotate_offset_data[4][5][2] = {
+    {{0, 0}, {0, 0}, {0, 0}, {0, 0}, {0, 0}},   //0
+    {{0, 0}, {1, 0}, {1, -1}, {0, 2}, {1, 2}},  //R
+    {{0, 0}, {0, 0}, {0, 0}, {0, 0}, {0, 0}},   //2
+    {{0, 0}, {-1, 0}, {-1, -1}, {0, 2}, {-1, 2}}//L
+};
+
+//ccw at even indices, cw at odd indices
+const int8_t rotate_offset_data_i_base[8][2] = {
+    {0, -1},    //0->L
+    {1, 0},     //0->R
+    {-1, 0},    //R->0
+    {0, -1},    //R->2
+    {0, 1},     //2->R
+    {-1, 0},    //2->L
+    {1, 0},     //L->2
+    {0, 1}      //L->0
+};
+
+const int8_t rotate_offset_data_i_arika[8][5][2] = {
+    {{0,0}, {2,0}, {-1,0}, {-1,2}, {2,-1}},   //0->L
+    {{0,0}, {-2,0}, {1,0}, {1,2}, {-2,-1}},   //0->R
+    {{0,0}, {2,0}, {-1,0}, {2,1}, {-1,-2}},   //R->0
+    {{0,0}, {-1,0}, {2,0}, {-1,2}, {2,-1}},   //R->2
+    {{0,0}, {-2,0}, {1,0}, {-2,1}, {1,-1}},   //2->R
+    {{0,0}, {2,0}, {-1,0}, {2,1}, {-1,-1}},   //2->L
+    {{0,0}, {1,0}, {-2,0}, {1,2}, {-2,-1}},   //L->2
+    {{0,0}, {-2,0}, {1,0}, {-2,1}, {1,-2}}    //L->0
+};
+
+void reset_game()
+{
+    //clear the playfield
+    memset(matrix, 0, sizeof(matrix));
+
+    score = 0;
+    game_over = false;
+
+    //clear active and ghost pieces
+    memset(&active_piece, 0, sizeof(active_piece));
+    memset(&ghost_piece, 0, sizeof(ghost_piece));
+
+    held_piece_shape = -1;
+    hold_avail = true;
+
+    //set up random bag
+    rand_bag_loc = 0;
+    gen_rand_bag(false);
+    gen_rand_bag(true);
+
+    cur_phase = GENERATION;
+
+    generation_timer_flag = -1;
+    memset(&generation_timer, 0, sizeof(generation_timer));
+}
 
 //check if current piece is colliding with blocks on playfield
 //returns true if colliding or out of bounds
@@ -77,6 +139,8 @@ void lock_piece() {
         }
         nested_break:
 
+        hold_avail = true;
+
         if (oob) game_over = true;
     }
 }
@@ -107,7 +171,7 @@ void gen_rand_bag(bool second_half) {
 }
 
 //place new tetrimino
-void new_piece(int new_shape) {
+void spawn_piece(int new_shape) {
     //default
     if (new_shape == -1) active_piece.shape = rand_bag[rand_bag_loc++];
     //called by hold_piece
@@ -157,37 +221,6 @@ void move(bool dir) {
 
     if (is_colliding()) active_piece.x = x_old;
 }
-
-
-int8_t rotate_offset_data[4][5][2] = {
-    {{0, 0}, {0, 0}, {0, 0}, {0, 0}, {0, 0}},   //0
-    {{0, 0}, {1, 0}, {1, -1}, {0, 2}, {1, 2}},  //R
-    {{0, 0}, {0, 0}, {0, 0}, {0, 0}, {0, 0}},   //2
-    {{0, 0}, {-1, 0}, {-1, -1}, {0, 2}, {-1, 2}}//L
-};
-
-//ccw at even indices, cw at odd indices
-int8_t rotate_offset_data_i_base[8][2] = {
-    {0, -1},    //0->L
-    {1, 0},     //0->R
-    {-1, 0},    //R->0
-    {0, -1},    //R->2
-    {0, 1},     //2->R
-    {-1, 0},    //2->L
-    {1, 0},     //L->2
-    {0, 1}      //L->0
-};
-
-int8_t rotate_offset_data_i_arika[8][5][2] = {
-    {{0,0}, {2,0}, {-1,0}, {-1,2}, {2,-1}},   //0->L
-    {{0,0}, {-2,0}, {1,0}, {1,2}, {-2,-1}},   //0->R
-    {{0,0}, {2,0}, {-1,0}, {2,1}, {-1,-2}},   //R->0
-    {{0,0}, {-1,0}, {2,0}, {-1,2}, {2,-1}},   //R->2
-    {{0,0}, {-2,0}, {1,0}, {-2,1}, {1,-1}},   //2->R
-    {{0,0}, {2,0}, {-1,0}, {2,1}, {-1,-1}},   //2->L
-    {{0,0}, {1,0}, {-2,0}, {1,2}, {-2,-1}},   //L->2
-    {{0,0}, {-2,0}, {1,0}, {-2,1}, {1,-2}}    //L->0
-};
 
 //rotate piece
 //cw: rotate clockwise
@@ -292,7 +325,7 @@ void hold_piece() {
     held_piece_shape = active_piece.shape;
 
     //if originally held piece is -1 (empty), new piece will come from bag
-    new_piece(temp);
+    spawn_piece(temp);
     return;
 }
 
@@ -368,26 +401,116 @@ int coord_to_matrix(int x, int y) {
     return (M_HEIGHT - y - 1) * M_WIDTH + x;
 } */
 
-int game_loop() {
-    //clear playfield
-    memset(matrix, EMPTY, sizeof(matrix));
-    active_piece.shape = -1;
+//callback function for add_repeating_timer calls
+bool oneshot_cb(repeating_timer_t *rt) {
+    int *flag = (int *) rt->user_data;
+    *flag = 1; //fired
+
+    //oneshot
+    return false;
+}
+
+void update_generation() {
+
+    //TODO: handle input
+
+    if (0 && hold_avail) { //hold piece
+        cancel_repeating_timer(&generation_timer);
+        generation_timer_flag = -1;
+        hold_piece();
+    }
+
+    if (generation_timer_flag == -1) {
+        //arm timer
+        generation_timer_flag = 0;
+        add_repeating_timer_ms(GENERATION_TIME * 1000, oneshot_cb, &generation_timer_flag, &generation_timer);
+    }
+
+    if (generation_timer_flag == 1) {
+        //timer has fired, now disarm
+        generation_timer_flag = -1;
+
+        spawn_piece(-1);
+
+        cur_phase = FALLING;
+    }
+}
+
+void update_falling() {
+    //TODO: handle input
     
-    //set up bag
-    gen_rand_bag(false);
-    gen_rand_bag(true);
+    if (0) { //hard drop
+        hard_drop(false);
+        cur_phase = CLEAR;
+    }
 
-    //game start animation here
+    if (0) { //soft drop
 
-    new_piece(-1);
+    }
+
+    if (0) { //movement
+
+    }
+
+    active_piece.y += 1;
+    if (is_colliding()) {
+        cur_phase = LOCK;
+    }
+    active_piece.y -= 1;
+}
+
+void update_lock() {
+
+}
+
+void update_clear() {
+
+}
+
+void update_game() {
+
+    GamePhase prev_phase;
+
+    do {
+        prev_phase = cur_phase;
+
+        switch (cur_phase) {
+            case GENERATION:
+                update_generation();
+                break;
+            case FALLING:
+                update_falling();
+                break;
+            case LOCK:
+                update_lock();
+                break;
+            case CLEAR:
+                update_clear();
+                break;
+        }
+        
+    } while (prev_phase != cur_phase);
+    //can continue when phase stays the same
+
+};
+
+int game_loop() {
+    reset_game();
+
+    //game start stuff
 
     while (!game_over) {
-        //process_inputs here
+        //read_input();
 
-        //render_frame here
+        update_game();
+
+        render_frame();
         while (!frame_ready) tight_loop_contents();
-        //display_frame here (set frame ready to false at start of this func)
+        frame_ready = false;
+        //display_frame here (change which framebuffer display.c reads from)
     }
+
+    //game over stuff
 
     return 0;
 }

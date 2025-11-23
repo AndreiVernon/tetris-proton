@@ -108,6 +108,7 @@ void render_matrix() {
 //takes piece and renders from bottom left corner at x_offset, y_offset
 //sets color based on cur_piece.shape
 void render_piece(Piece cur_piece, int x_offset, int y_offset) {
+    //-1 means piece is hidden
     if (cur_piece.shape == -1) return;
 
     uint8_t col[3];
@@ -194,7 +195,7 @@ void render_next() {
     }
 }
 
-void render_tetris() {
+void render_frame() {
     render_background();
     render_matrix();
     render_piece(ghost_piece, MATRIX_OFFSET_X, MATRIX_OFFSET_Y);

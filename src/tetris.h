@@ -16,7 +16,7 @@
 #define EMPTY 67
 #define GHOST 61
 
-typedef struct _Piece {
+typedef struct {
     int shape;          //shape id, 0-6
     int x, y;           //coords, x=0 is left and y=0 is bottom
     int rotation;       //0, 1=R, 2, 3=L
@@ -24,15 +24,23 @@ typedef struct _Piece {
     int size;           //mask size
 } Piece;
 
+typedef enum {
+    GENERATION = 0,
+    FALLING,
+    LOCK,
+    CLEAR
+} GamePhase;
+
 extern uint8_t matrix[M_HEIGHT][M_WIDTH];
 extern uint32_t score;
 extern volatile bool game_over;
-extern Piece active_piece;        //currently active piece
-extern Piece ghost_piece;        //ghost piece / shadow of active piece
-extern int held_piece_shape;        //shape of held piece
-extern bool hold_avail;     //can hold piece
-extern int rand_bag[14];           //bag of upcoming pieces
-extern int rand_bag_loc;           //index of bag
+extern Piece active_piece;      //currently active piece
+extern Piece ghost_piece;       //ghost piece / shadow of active piece
+extern int held_piece_shape;    //shape of held piece
+extern bool hold_avail;         //can hold piece
+extern int rand_bag[14];        //bag of upcoming pieces
+extern int rand_bag_loc;        //index of bag
+extern GamePhase cur_phase;
 
 extern const int piece_mask_sizes[7];
 extern const uint8_t piece_masks[7][25];   //from bottom left to top right
