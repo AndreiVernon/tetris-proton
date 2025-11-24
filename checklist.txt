@@ -3,7 +3,9 @@ X-piece data structure
 X-playfield matrix data structure
 X-spawn piece
 X-random piece selection / 7-bag logic
-X-hold piece logic
+!!-hold piece logic
+--todo: can't hold and unhold a piece before a new one locks
+---use a "hold available" var and reset it during a lock
 X-collision detection
 X-oob detection
 X-add locked piece to playfield matrix
@@ -15,15 +17,15 @@ X--matrix rotation
 X--rotation offset tables
 X---derive Arika wall kick data for I piece
 -gravity
-X-soft drop piece
+!!-soft drop piece
+--todo: soft drop doesn't move down by one, instead it amplifies gravity by 20x
 X-hard drop piece
 -delayed auto shift / auto repeat (behaviour when holding movement key)
 --implement in move l/r
 --implement in soft drop
 --determine behaviour that stops/resets movement
----rotation
----collision
----no longer pressing
+---only when no longer pressing
+---continues to next piece after lock down if still pressed
 -calculate time before piece locks
 --0.5s lock delay when gravity less than 20G?
 -pause menu
@@ -61,15 +63,17 @@ Graphics:
 X-frame timing
 -render menus
 --option cycling and moving between options
--render static game elements
---arena, "hold", "next", score, time
---garbage progress bar?
--render pieces for hold and next
--render pieces in playfield matrix
--render active piece
--render ghost piece
---disabled when no active piece
---use hard drop function to get new position
+--score and time in-game
+X-render static game elements
+X--arena, "hold", "next"
+-garbage progress bar?
+X-render pieces for hold
+X-render pieces for next
+X-render pieces in playfield matrix
+X-render active piece
+X-render ghost piece
+X--disabled when no active piece
+X--use hard drop function to get new position
 -VFX?
 
 Text:

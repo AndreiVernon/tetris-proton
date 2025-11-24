@@ -1,8 +1,13 @@
 #ifndef __GRAPHICS_H__
 #define __GRAPHICS_H__
 
+#include "pico/stdlib.h"
+
 #define TARGET_FRAMERATE 60
 
-bool frame_ready = false;   //frame ready to display
+extern volatile bool frame_ready;   //frame ready to display
+
+void render_frame();
+void init_frame_timer();
 
 #endif
