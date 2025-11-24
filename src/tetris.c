@@ -6,7 +6,7 @@
 #include "tetris.h"
 #include "graphics.h"
 
-#define GENERATION_TIME 0.2  //in s
+#define GENERATION_DELAY 0.2  //in s
 
 uint8_t matrix[M_HEIGHT][M_WIDTH] = {0};
 uint32_t score = 0;
@@ -423,7 +423,7 @@ void update_generation() {
     if (generation_timer_flag == -1) {
         //arm timer
         generation_timer_flag = 0;
-        add_repeating_timer_ms(GENERATION_TIME * 1000, oneshot_cb, &generation_timer_flag, &generation_timer);
+        add_repeating_timer_ms(GENERATION_DELAY * 1000, oneshot_cb, &generation_timer_flag, &generation_timer);
     }
 
     if (generation_timer_flag == 1) {
@@ -437,11 +437,20 @@ void update_generation() {
 }
 
 void update_falling() {
+
+    //start gravity timer
+
     //TODO: handle input
+
+    if (0 && hold_avail) { //hold piece
+        cur_phase = GENERATION;
+        return;
+    }
     
     if (0) { //hard drop
         hard_drop(false);
         cur_phase = CLEAR;
+        return;
     }
 
     if (0) { //soft drop
@@ -449,6 +458,10 @@ void update_falling() {
     }
 
     if (0) { //movement
+
+    }
+
+    if (0) { //rotation
 
     }
 
@@ -460,7 +473,7 @@ void update_falling() {
 }
 
 void update_lock() {
-
+    //cancel gravity timer
 }
 
 void update_clear() {

@@ -46,6 +46,9 @@
 #define BCM_BITS 6        // number of bit planes (3 => uses bits 7,6,5 of each color)
 #define LSB_TIME_US 1    // duration of LSB plane in microseconds (tweak if flicker)
 
+// framebuffer[row][col][rgb] - 3d array that stores what to display
+uint8_t framebuffer[PANEL_HEIGHT][PANEL_WIDTH][3];
+
 // masks for fast operations
 static const uint32_t DATA_MASK = (1u<<R1)|(1u<<G1)|(1u<<B1)|(1u<<R2)|(1u<<G2)|(1u<<B2);
 static const uint32_t ADDR_MASK = (1u<<A)|(1u<<B)|(1u<<C)|(1u<<D)|(1u<<E);

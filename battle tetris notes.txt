@@ -62,3 +62,31 @@ audio:
 -playing complex audio blog: https://antirez.com/news/143
 -amy goal: get complex audio playing (tetris?) within total 16MB flash memory budget
 -when playing multiplayer, run audio from only one console and use UART comms to control the other machine's sound effects
+
+
+-------------
+Meeting Notes 23 Nov:
+
+raahil:
+-write render_score and render_time in graphics.c
+-add second framebuffer, and variables to allow display.c to switch between them
+--graphics.c writes to the framebuffer that is not currently in use
+-convert display.c to PIO and DMA
+
+amy:
+-write audio buffer logic
+--buffer size: 512 samples
+--need 2 buffers: dma is reads from 1 buffer while cpu writes to the other
+-make convenience function to play song and sound effect
+
+audio buffer:
+-dma reads from buffer 1, then sets off an interrupt and switches to buffer 2
+-interrupt tells cpu to start writing next audio data to buffer 1 based on currently active song and effect
+-when dma is done reading buffer 2, sets off an interrupt and switches to buffer 1
+-interrupt tells cpu to start writing next audio data to buffer 2 based on currently active song and effect
+
+davis:
+-create NES connector
+-write input gpio logic
+-create UART physical connection with USB
+-write UART logic

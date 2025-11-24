@@ -9,7 +9,7 @@
 #define PANEL_ROWS 32 // # of row addresses (scans 32 times to cover all 64 physical rows by scanning upper half and lower half)
 
 // framebuffer[row][col][rgb] - 3d array that stores what to display
-uint8_t framebuffer[PANEL_HEIGHT][PANEL_WIDTH][3];
+extern uint8_t framebuffer[PANEL_HEIGHT][PANEL_WIDTH][3];
 
 void display_loop();
 
