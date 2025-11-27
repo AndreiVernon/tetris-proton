@@ -20,8 +20,13 @@ int rand_bag_loc = 0;           //index of bag
 GamePhase cur_phase = GENERATION;
 
 int frame_timer;
+
 int generation_timer_flag = -1;     //-1 = not armed, 0 = armed, 1 = fired
 repeating_timer_t generation_timer = {0};
+
+int gravity_timer_flag = -1;     //-1 = not armed, 0 = armed, 1 = fired
+repeating_timer_t gravity_timer = {0};
+bool soft_drop_active = false;
 
 const int piece_mask_sizes[7] = {5, 2, 3, 3, 3, 3, 3};
 //from bottom left to top right
@@ -287,9 +292,27 @@ void rotate(bool cw) {
 }
 
 //drop piece slowly
-void soft_drop() {
+//returns true if piece ended up touching surface
+bool drop_piece(int drop_count) {
+    int dropped;
+    for (dropped = 0; dropped < drop_count; dropped++) {
+        active_piece.y--;
+
+        if (is_colliding()) {
+            active_piece.y++;
+            return true;
+        }
+    }
+    
+    return false;
+}
+
+bool is_touching_surface() {
     active_piece.y--;
-    if (is_colliding()) active_piece.y++;
+    bool temp = is_colliding();
+    active_piece.y++;
+
+    return temp;
 }
 
 //drop piece instantly
@@ -310,10 +333,6 @@ void update_ghost() {
     ghost_piece = active_piece;
     ghost_piece.shape = GHOST;
     hard_drop(true);
-}
-
-void do_gravity() {
-
 }
 
 //hold / swap held piece
@@ -436,9 +455,31 @@ void update_generation() {
     }
 }
 
+//callback function specifically for gravity timer calls
+bool gravity_cb(repeating_timer_t *rt) {
+    int *flag = (int *) rt->user_data;
+    *flag += 1; //fired
+
+    //repeating
+    return true;
+}
+
 void update_falling() {
 
-    //start gravity timer
+    if (gravity_timer_flag == -1) {
+        //arm timer
+        gravity_timer_flag = 0;
+        add_repeating_timer_ms(GENERATION_DELAY * 1000, gravity_cb, &gravity_timer_flag, &gravity_timer);
+    }
+
+    if (generation_timer_flag >= 1) {
+        int drop_count = generation_timer_flag;
+
+        //timer has fired 1 or more times, reset
+        generation_timer_flag -= drop_count;
+
+
+    }
 
     //TODO: handle input
 
@@ -505,6 +546,8 @@ void update_game() {
     } while (prev_phase != cur_phase);
     //can continue when phase stays the same
 
+    update_ghost();
+
 };
 
 int game_loop() {
@@ -513,7 +556,7 @@ int game_loop() {
     //game start stuff
 
     while (!game_over) {
-        //read_input();
+        get_inputs();
 
         update_game();
 
