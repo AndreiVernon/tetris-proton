@@ -7,8 +7,9 @@
 #include "graphics.h"
 #include "input.h"
 
-#define GENERATION_DELAY 0.2  //in s
-#define GRAVITY_DELAY 0.8 //secs to fall one row
+#define GENERATION_DELAY 0.1  //in s
+#define GRAVITY_DELAY 0.4 //secs to fall one row
+#define GRAVITY_SOFT_MULT 10 //how much soft drop multiplies gravity by
 
 uint8_t matrix[M_HEIGHT][M_WIDTH] = {0};
 uint32_t score = 0;
@@ -26,7 +27,8 @@ int frame_timer;
 int generation_timer_flag = -1;     //-1 = not armed, 0 = armed, 1 = fired
 repeating_timer_t generation_timer = {0};
 
-int gravity_timer_flag = -1;     //-1 = not armed, 0 = armed, 1 = fired
+int gravity_timer_flag = -1;     //-1 = not armed, 0 = normal, 1 = soft drop
+int gravity_count = 0;
 repeating_timer_t gravity_timer = {0};
 bool soft_drop_active = false;
 
@@ -101,23 +103,26 @@ void reset_game()
     memset(&generation_timer, 0, sizeof(generation_timer));
 
     gravity_timer_flag = -1;
+    gravity_count = 0;
     memset(&gravity_timer, 0, sizeof(gravity_timer));
     soft_drop_active = false;
 }
 
 //check if current piece is colliding with blocks on playfield
 //returns true if colliding or out of bounds
-bool is_colliding() {
-    for (int y = 0; y < active_piece.size; y++) {
-        for (int x = 0; x < active_piece.size; x++) {
+bool is_colliding(bool ghost) {
+    Piece cur_piece = ghost ? ghost_piece : active_piece;
+
+    for (int y = 0; y < cur_piece.size; y++) {
+        for (int x = 0; x < cur_piece.size; x++) {
             //check every active block in piece mask
-            if (active_piece.mask[y * active_piece.size + x]) {
+            if (cur_piece.mask[y * cur_piece.size + x]) {
                 //check for oob
-                if (active_piece.x + x < 0 || active_piece.x + x >= M_WIDTH || active_piece.y + y < 0 || active_piece.y + y >= M_HEIGHT)
+                if (cur_piece.x + x < 0 || cur_piece.x + x >= M_WIDTH || cur_piece.y + y < 0 || active_piece.y + y >= M_HEIGHT)
                     return true;
 
                 //check for collision
-                if (matrix[active_piece.y + y][active_piece.x + x] != EMPTY)
+                if (matrix[cur_piece.y + y][cur_piece.x + x] != EMPTY)
                     return true;
             }
         }
@@ -153,10 +158,11 @@ void lock_piece() {
         }
         nested_break:
 
-        hold_avail = true;
-
         if (oob) game_over = true;
     }
+
+    hold_avail = true;
+    active_piece.shape = INACTIVE;
 }
 
 //generates random bag of tetriminos
@@ -222,7 +228,7 @@ void spawn_piece(int new_shape) {
     }
 
     //game over check
-    game_over = is_colliding();
+    game_over = is_colliding(false);
 }
 
 //move piece left or right
@@ -233,7 +239,7 @@ void move(bool dir) {
     if (dir) active_piece.x++;
     else active_piece.x--;
 
-    if (is_colliding()) active_piece.x = x_old;
+    if (is_colliding(false)) active_piece.x = x_old;
 }
 
 //rotate piece
@@ -271,7 +277,7 @@ void rotate(bool cw) {
             active_piece.x = x_old + rotate_offset_data_i_base[active_piece.rotation*2 + cw][0] + rotate_offset_data_i_arika[active_piece.rotation*2 + cw][i][0];
             active_piece.y = y_old + rotate_offset_data_i_base[active_piece.rotation*2 + cw][1] + rotate_offset_data_i_arika[active_piece.rotation*2 + cw][i][1];
             
-            if (!is_colliding()) {
+            if (!is_colliding(false)) {
                 success = true;
                 break;
             }
@@ -281,7 +287,7 @@ void rotate(bool cw) {
             active_piece.x = x_old + rotate_offset_data[active_piece.rotation][i][0] - rotate_offset_data[rotation_target][i][0];
             active_piece.y = y_old + rotate_offset_data[active_piece.rotation][i][1] - rotate_offset_data[rotation_target][i][1];
             
-            if (!is_colliding()) {
+            if (!is_colliding(false)) {
                 success = true;
                 break;
             }
@@ -302,7 +308,7 @@ void rotate(bool cw) {
 
 bool is_touching_surface() {
     active_piece.y--;
-    bool temp = is_colliding();
+    bool temp = is_colliding(false);
     active_piece.y++;
 
     return temp;
@@ -312,13 +318,12 @@ bool is_touching_surface() {
 void hard_drop(bool ghost) {
     Piece* piece_sel = ghost ? &ghost_piece : &active_piece;
 
-    //go from -2 to height+2 cause thats the highest/lowest a piece can be within mask
-    for (int y = -2; y < M_HEIGHT+2; y++) {
-        piece_sel->y = y;
-        if (!is_colliding()) break;
-    }
+    if (piece_sel->shape == INACTIVE) return;
 
-    if (!ghost) lock_piece();
+    int temp = piece_sel->y;
+    while (!is_colliding(ghost)) piece_sel->y--;
+
+    if (temp != piece_sel->y) piece_sel->y++;
 }
 
 //update ghost piece
@@ -336,8 +341,8 @@ void hold_piece() {
     int temp = held_piece_shape;
     held_piece_shape = active_piece.shape;
 
-    //if originally held piece is -1 (empty), new piece will come from bag
-    spawn_piece(temp);
+    //if originally held piece is INACTIVE (-1), new piece will come from bag
+    active_piece.shape = temp;
     return;
 }
 
@@ -409,7 +414,7 @@ bool drop_piece(int drop_count) {
     for (dropped = 0; dropped < drop_count; dropped++) {
         active_piece.y--;
 
-        if (is_colliding()) {
+        if (is_colliding(false)) {
             active_piece.y++;
             return true;
         }
@@ -439,8 +444,6 @@ bool oneshot_cb(repeating_timer_t *rt) {
 }
 
 void update_generation() {
-    active_piece.shape = INACTIVE;
-
     //hold piece
     if (cur_inputs.hold && hold_avail) {
         cancel_repeating_timer(&generation_timer);
@@ -457,10 +460,9 @@ void update_generation() {
     //timer has fired, now disarm
     if (generation_timer_flag == 1) {
         generation_timer_flag = -1;
-        spawn_piece(-1);
+        spawn_piece(active_piece.shape);
 
-        //guide says "immediately drops one row"
-        //TODO: check effect
+        //guide says "immediately drops one row" if it has space
         drop_piece(1);
 
         cur_phase = FALLING;
@@ -483,10 +485,16 @@ void cancel_gravity() {
 
 void update_falling() {
 
+    //soft drop no longer pressed
+    if (gravity_timer_flag == 1 && !cur_inputs.soft_drop) {
+        cancel_gravity();
+        gravity_timer_flag = -1;
+    }
+
     if (gravity_timer_flag == -1) {
         //arm timer
         gravity_timer_flag = 0;
-        add_repeating_timer_ms(GRAVITY_DELAY * 1000, gravity_cb, &gravity_timer_flag, &gravity_timer);
+        add_repeating_timer_ms(GRAVITY_DELAY * 1000, gravity_cb, &gravity_count, &gravity_timer);
     }
 
     //hold piece
@@ -506,9 +514,10 @@ void update_falling() {
     }
 
     //soft drop
-    if (cur_inputs.soft_drop) {
+    if (cur_inputs.soft_drop && gravity_timer_flag != 1) {
         cancel_gravity();
-        add_repeating_timer_ms(GRAVITY_DELAY * 1000 / 20, gravity_cb, &gravity_timer_flag, &gravity_timer);
+        add_repeating_timer_ms(GRAVITY_DELAY * 1000 / GRAVITY_SOFT_MULT, gravity_cb, &gravity_count, &gravity_timer);
+        gravity_timer_flag = 1;
     }
 
     //movement
@@ -522,11 +531,11 @@ void update_falling() {
     }
 
     //perform inputs before applying gravity so game feels more responsive
-    if (generation_timer_flag >= 1) {
-        int drop_count = generation_timer_flag;
+    if (gravity_count >= 1) {
+        int drop_count = gravity_count;
 
         //timer has fired 1 or more times, reset
-        generation_timer_flag -= drop_count;
+        gravity_count -= drop_count;
 
         //try to drop piece, if it touches ground in process, switch to lock phase
         if (drop_piece(drop_count)) {
@@ -540,7 +549,7 @@ void update_falling() {
 
     //check if piece touching surface
     active_piece.y += 1;
-    if (is_colliding()) {
+    if (is_colliding(false)) {
         cancel_gravity();
         cur_phase = LOCK;
     }
@@ -595,12 +604,16 @@ int game_loop() {
 
         update_game();
 
+        matrix[21][0] = hold_avail ? GARBAGE : EMPTY;
+
         render_frame();
         while (!frame_ready) tight_loop_contents();
         frame_ready = false;
     }
 
     //game over stuff
+
+    while (true) render_frame();
 
     return 0;
 }

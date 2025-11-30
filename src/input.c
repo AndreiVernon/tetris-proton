@@ -26,13 +26,34 @@ void init_inputs() {
 
     //proton buttons
     gpio_init_mask(1 << 21 | 1 << 26);
-    sio_hw->gpio_oe_clr = 1 << 21 | 1 << 26;
+    gpio_set_dir(21, false);
+    gpio_set_dir(26, false);
+
+    //external buttons
+    for (int i = 33; i < 36; i++) {
+        gpio_init(i);
+        gpio_pull_up(i);
+        gpio_set_dir(i, false);
+    }
 }
 
 //set values in raw_inputs
-void read_raw_inputs() {    
-    raw_inputs.left = gpio_get(26);
-    raw_inputs.right = gpio_get(21);
+void read_raw_inputs() {
+    int but1 = !gpio_get(33);
+    int but2 = !gpio_get(34);
+    int but3 = !gpio_get(35);
+
+    raw_inputs.start = but1;
+    raw_inputs.up = but2;
+    //raw_inputs.down = but3;
+
+    if (but3) {
+        raw_inputs.a = gpio_get(26);
+        raw_inputs.b = gpio_get(21);
+    } else {
+        raw_inputs.left = gpio_get(26);
+        raw_inputs.right = gpio_get(21);
+    }
 }
 
 
@@ -44,7 +65,7 @@ static inline bool edge_activated_u8(uint8_t buf) {
     //11 - being held, do nothing
     //10 - just let go, do nothing 
 
-    return (buf & 0b11u) == 0b01u;
+    return (buf & 0b111u) == 0b001u;
 }
 
 //dir: 0 = left, 1 = right
@@ -97,14 +118,14 @@ void get_inputs(void) {
     cur_inputs.soft_drop = raw_inputs.down;
 
     //hold and release
-    up_buf     = ((up_buf     << 1) | raw_inputs.up)     & 0b11;
-    a_buf      = ((a_buf      << 1) | raw_inputs.a)      & 0b11;
-    b_buf      = ((b_buf      << 1) | raw_inputs.b)      & 0b11;
-    start_buf  = ((start_buf  << 1) | raw_inputs.start)  & 0b11;
-    select_buf = ((select_buf << 1) | raw_inputs.select) & 0b11;
+    up_buf     = ((up_buf     << 1) | raw_inputs.up)     & 0b111;
+    a_buf      = ((a_buf      << 1) | raw_inputs.a)      & 0b111;
+    b_buf      = ((b_buf      << 1) | raw_inputs.b)      & 0b111;
+    start_buf  = ((start_buf  << 1) | raw_inputs.start)  & 0b111;
+    select_buf = ((select_buf << 1) | raw_inputs.select) & 0b111;
 
-    cur_inputs.rot_left  = edge_activated_u8(a_buf);
-    cur_inputs.rot_right = edge_activated_u8(b_buf);
+    cur_inputs.rot_left  = edge_activated_u8(b_buf);
+    cur_inputs.rot_right = edge_activated_u8(a_buf);
     cur_inputs.hard_drop = edge_activated_u8(up_buf);
     cur_inputs.hold      = edge_activated_u8(start_buf);
     cur_inputs.pause     = edge_activated_u8(select_buf);

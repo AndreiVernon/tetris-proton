@@ -1,3 +1,8 @@
+Immediate Debug:
+-I-piece rotation is broken
+-when hit hold on a piece that is partially fallen, the new piece appears in its position
+--has to do with confusing active_piece.shape with next_shape. make a new variable for this
+
 Game Logic:
 X-piece data structure
 X-playfield matrix data structure

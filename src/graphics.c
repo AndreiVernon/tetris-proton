@@ -156,7 +156,7 @@ void render_hold() {
 
     int x_offset, y_offset;
     if (held_piece_shape == I_PIECE) {
-        x_offset = 43;
+        x_offset = 41;
         y_offset = 49;
     } else if (held_piece_shape == O_PIECE) {
         x_offset = 45;
@@ -179,7 +179,7 @@ void render_next() {
 
         
         if (cur_piece.shape == I_PIECE) {
-            x_offset = 43;
+            x_offset = 41;
             y_offset -= 6;
         } else if (cur_piece.shape == O_PIECE) {
             x_offset = 45;
@@ -191,7 +191,8 @@ void render_next() {
 
         render_piece(cur_piece, x_offset, y_offset);
 
-        if (cur_piece.shape == O_PIECE) y_offset -= 2;
+        if (cur_piece.shape == I_PIECE) y_offset += 2;
+        else if (cur_piece.shape == O_PIECE) y_offset -= 2;
     }
 }
 

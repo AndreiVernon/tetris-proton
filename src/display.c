@@ -152,14 +152,16 @@ static void shift_row_bitplane(uint8_t row, uint8_t bit_plane) {
     gpio_put(OE, 1);
 }
 
-// top-level refresh: iterate over bitplanes, then half-rows 0..31
+//top-level refresh: iterate over bitplanes, then half-rows 0..31
 void display_refresh() {
     // For each bit-plane (MSB first)
-    for (uint8_t bit_plane = 0; bit_plane < BCM_BITS; ++bit_plane)
-    {
-        // scan half-rows (0..(PANEL_HEIGHT/2 - 1))
-        for (uint8_t row = 0; row < (PANEL_HEIGHT / 2); ++row)
-        {
+    for (uint8_t bit_plane = 0; bit_plane < BCM_BITS; ++bit_plane) {
+        //scan half-rows (0..(PANEL_HEIGHT/2 - 1))
+        //doing even rows then odd rows in interlaced pattern reduces perceived flickering
+        for (uint8_t row = 0; row < (PANEL_HEIGHT / 2); row += 2) {
+            shift_row_bitplane(row, bit_plane);
+        }
+        for (uint8_t row = 1; row < (PANEL_HEIGHT / 2); row += 2) {
             shift_row_bitplane(row, bit_plane);
         }
     }
