@@ -5,8 +5,10 @@
 #include "pico/rand.h"
 #include "tetris.h"
 #include "graphics.h"
+#include "input.h"
 
 #define GENERATION_DELAY 0.2  //in s
+#define GRAVITY_DELAY 0.8 //secs to fall one row
 
 uint8_t matrix[M_HEIGHT][M_WIDTH] = {0};
 uint32_t score = 0;
@@ -291,22 +293,6 @@ void rotate(bool cw) {
     active_piece.rotation = rotation_target;
 }
 
-//drop piece slowly
-//returns true if piece ended up touching surface
-bool drop_piece(int drop_count) {
-    int dropped;
-    for (dropped = 0; dropped < drop_count; dropped++) {
-        active_piece.y--;
-
-        if (is_colliding()) {
-            active_piece.y++;
-            return true;
-        }
-    }
-    
-    return false;
-}
-
 bool is_touching_surface() {
     active_piece.y--;
     bool temp = is_colliding();
@@ -430,26 +416,27 @@ bool oneshot_cb(repeating_timer_t *rt) {
 }
 
 void update_generation() {
-
-    //TODO: handle input
-
-    if (0 && hold_avail) { //hold piece
+    //hold piece
+    if (cur_inputs.hold && hold_avail) {
         cancel_repeating_timer(&generation_timer);
         generation_timer_flag = -1;
         hold_piece();
     }
 
+    //arm timer
     if (generation_timer_flag == -1) {
-        //arm timer
         generation_timer_flag = 0;
         add_repeating_timer_ms(GENERATION_DELAY * 1000, oneshot_cb, &generation_timer_flag, &generation_timer);
     }
 
+    //timer has fired, now disarm
     if (generation_timer_flag == 1) {
-        //timer has fired, now disarm
         generation_timer_flag = -1;
-
         spawn_piece(-1);
+
+        //guide says "immediately drops one row"
+        //TODO: check effect
+        drop_piece(1);
 
         cur_phase = FALLING;
     }
@@ -464,50 +451,88 @@ bool gravity_cb(repeating_timer_t *rt) {
     return true;
 }
 
+void cancel_gravity() {
+    cancel_repeating_timer(&gravity_timer);
+    gravity_timer_flag = -1;
+}
+
+//drop piece slowly
+//returns true if piece ended up touching surface
+bool drop_piece(int drop_count) {
+    int dropped;
+    for (dropped = 0; dropped < drop_count; dropped++) {
+        active_piece.y--;
+
+        if (is_colliding()) {
+            active_piece.y++;
+            return true;
+        }
+    }
+    
+    return false;
+}
+
 void update_falling() {
 
     if (gravity_timer_flag == -1) {
         //arm timer
         gravity_timer_flag = 0;
-        add_repeating_timer_ms(GENERATION_DELAY * 1000, gravity_cb, &gravity_timer_flag, &gravity_timer);
+        add_repeating_timer_ms(GRAVITY_DELAY * 1000, gravity_cb, &gravity_timer_flag, &gravity_timer);
     }
 
+    //hold piece
+    if (cur_inputs.hold && hold_avail) {
+        cancel_gravity();
+        hold_piece();
+        cur_phase = GENERATION;
+        return;
+    }
+    
+    //hard drop
+    if (cur_inputs.hard_drop) {
+        cancel_gravity();
+        hard_drop(false);
+        cur_phase = CLEAR;
+        return;
+    }
+
+    //soft drop
+    if (cur_inputs.soft_drop) {
+        cancel_gravity();
+        add_repeating_timer_ms(GRAVITY_DELAY * 1000 / 20, gravity_cb, &gravity_timer_flag, &gravity_timer);
+    }
+
+    //movement
+    if (cur_inputs.left || cur_inputs.right) {
+        move(cur_inputs.right);
+    }
+
+    //rotation
+    if (cur_inputs.rot_left || cur_inputs.rot_right) {
+        rotate(cur_inputs.rot_right);
+    }
+
+    //perform inputs before applying gravity so game feels more responsive
     if (generation_timer_flag >= 1) {
         int drop_count = generation_timer_flag;
 
         //timer has fired 1 or more times, reset
         generation_timer_flag -= drop_count;
 
+        //try to drop piece, if it touches ground in process, switch to lock phase
+        if (drop_piece(drop_count)) {
+            cancel_gravity();
+            cur_phase = LOCK;
+        }
 
-    }
-
-    //TODO: handle input
-
-    if (0 && hold_avail) { //hold piece
-        cur_phase = GENERATION;
-        return;
-    }
-    
-    if (0) { //hard drop
-        hard_drop(false);
-        cur_phase = CLEAR;
+        //no point in checking if touching surface again
         return;
     }
 
-    if (0) { //soft drop
-
-    }
-
-    if (0) { //movement
-
-    }
-
-    if (0) { //rotation
-
-    }
-
+    //check if piece touching surface
     active_piece.y += 1;
     if (is_colliding()) {
+        cancel_gravity();
         cur_phase = LOCK;
     }
     active_piece.y -= 1;
