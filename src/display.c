@@ -1,9 +1,11 @@
 #include "pico/stdlib.h"
 #include "hardware/dma.h"
 #include "hardware/gpio.h"
+#include "hardware/pio.h"
 #include <string.h>
 #include "display.h"
 #include "assets.h"
+#include "hub75.pio.h"
 
 // 64x64 RGB LED Matrix - 3mm Pitch - 192mm x 192mm; Product ID: 4732
 // https://www.adafruit.com/product/4732
@@ -19,15 +21,17 @@
 // OE [x x] GND
 
 // https://docs.cirkitdesigner.com/component/885af448-2bdb-49bc-ae1b-0e781522c801/hub75
+// https://github.com/hzeller/rpi-rgb-led-matrix
 // ------------------------------------------------------------------------
 
 //assigning GPIOs to data cable ports for adafruit display ---> adjust numbers as needed
-#define R1 16   //red data for top half
-#define G1 10   //green data for top half
-#define B1 17   //blue data for top half
-#define R2 18   //red data for bottom half
-#define G2 11   //green data for bottom half
-#define B2 19   //blue data for bottom half
+#define DATA_BASE_PIN 2
+#define R1 (DATA_BASE_PIN + 0)   //red data for top half
+#define G1 (DATA_BASE_PIN + 1)   //green data for top half
+#define B1 (DATA_BASE_PIN + 2)   //blue data for top half
+#define R2 (DATA_BASE_PIN + 3)   //red data for bottom half
+#define G2 (DATA_BASE_PIN + 4)   //green data for bottom half
+#define B2 (DATA_BASE_PIN + 5)   //blue data for bottom half
 #define A 20    //row select bit 0
 #define B 13    //row select bit 1
 #define C 9    //row select bit 2 //was 21
@@ -37,23 +41,19 @@
 #define LAT 15  //stores shifted data into output register --> latch
 #define OE 23   //active low output enable
 
-#define GPIO_MASK ((1u<<R1) | (1u<<G1) | (1u<<B1) | (1u<<R2) | (1u<<G2) | (1u<<B2) | (1u<<A) | (1u<<B) | (1u<<C) | (1u<<D) | (1u<<E) | (1u<<CLK) | (1u<<LAT) | (1u<<OE))
+#define ADDR_MASK ((1u<<A)|(1u<<B)|(1u<<C)|(1u<<D)|(1u<<E))
 
-
-//https://github.com/hzeller/rpi-rgb-led-matrix
-
-//BCM configuration (tunable)
-#define BCM_BITS 5       //number of bit planes (3 => uses bits 7,6,5 of each color)
-#define LSB_TIME_US 2    //duration of LSB plane in microseconds (tweak if flicker)
+#define BCM_BITS 5       //number of bit planes (basically bit depth)
+#define LSB_TIME_US 2    //duration of LSB plane in microseconds
 
 //framebuffer[id][row][col][rgb] - 3d array that stores what to display
 uint8_t framebuffer[2][PANEL_HEIGHT][PANEL_WIDTH][3];
 //which framebuffer is ready to present
 volatile bool fbf_rdy;
 
-//masks for fast operations
-static const uint32_t DATA_MASK = (1u<<R1)|(1u<<G1)|(1u<<B1)|(1u<<R2)|(1u<<G2)|(1u<<B2);
-static const uint32_t ADDR_MASK = (1u<<A)|(1u<<B)|(1u<<C)|(1u<<D)|(1u<<E);
+PIO pio = pio0;
+uint sm;
+uint offset;
 
 void display_clear() {
     memset(framebuffer, 0, sizeof(framebuffer));
@@ -61,11 +61,11 @@ void display_clear() {
 
 // initialize GPIOs
 void display_init() {
-    int pins[] = {R1, G1, B1, R2, G2, B2, A, B, C, D, E, CLK, LAT, OE};
-    for (int i = 0; i < (int)(sizeof(pins)/sizeof(pins[0])); ++i) {
-        gpio_init(pins[i]);
-        gpio_set_dir(pins[i], GPIO_OUT);
-        gpio_put(pins[i], 0);
+    int ctrl_pins[] = {LAT, OE, A, B, C, D, E};
+    for (int i = 0; i < (int)(sizeof(ctrl_pins)/sizeof(ctrl_pins[0])); ++i) {
+        gpio_init(ctrl_pins[i]);
+        gpio_set_dir(ctrl_pins[i], GPIO_OUT);
+        gpio_put(ctrl_pins[i], 0);
     }
 
     //ensure outputs disabled to start (OE is active low)
@@ -75,11 +75,49 @@ void display_init() {
 
     display_clear();
     fbf_rdy = 0;
+
+    //initialize PIO for Data(0-5) and CLK(6)
+    offset = pio_add_program(pio, &hub75_program);
+    sm = pio_claim_unused_sm(pio, true);
+    pio_sm_config c = hub75_program_get_default_config(offset);
+
+    //map OUT pins to the contiguous block (R1..B2)
+    sm_config_set_out_pins(&c, DATA_BASE_PIN, 6);
+    
+    //map SIDE-SET pin to CLK
+    sm_config_set_sideset_pins(&c, CLK);
+
+    //set directions: 6 data pins + 1 clock pin = 7 outputs
+    pio_sm_set_consecutive_pindirs(pio, sm, DATA_BASE_PIN, 7, true);
+
+    //initialize the GPIOs for PIO
+    for (int i = 0; i < 7; ++i) {
+        pio_gpio_init(pio, DATA_BASE_PIN + i);
+    }
+
+    // Configure FIFO to auto-pull not required, using 'pull block' in PIO
+    // But we can join FIFOs to make it deeper if we want (optional)
+    // sm_config_set_fifo_join(&c, PIO_FIFO_JOIN_TX);
+
+    pio_sm_init(pio, sm, offset, &c);
+    pio_sm_set_enabled(pio, sm, true);
+}
+
+// Helper: Wait for PIO to finish shifting out data
+static inline void wait_for_pio_idle() {
+    // Wait until TX FIFO is empty
+    while (!pio_sm_is_tx_fifo_empty(pio, sm)) tight_loop_contents();
+    // Wait until SM is stalled (meaning it executed 'pull' and is waiting)
+    // The restart bit (8) in FDEBUG could also be used, or just checking execution status
+    // For simple shifting, waiting for FIFO empty + small delay is usually enough
+    // but on fast RP2350, we should be careful.
+    uint32_t sm_stall_mask = 1u << (PIO_FDEBUG_TXSTALL_LSB + sm);
+    pio->fdebug = sm_stall_mask; // clear stall flag
+    while (!(pio->fdebug & sm_stall_mask)) tight_loop_contents();
 }
 
 //set the row address lines A..E for a half-row index [0..31]
 static inline void send_row_address(uint8_t row) {
-    //produce mask for address lines (atomic)
     uint32_t mask_set = 0;
     if (row & 0x01) mask_set |= (1u<<A);
     if (row & 0x02) mask_set |= (1u<<B);
@@ -99,7 +137,8 @@ static void shift_row_bitplane(uint8_t row, uint8_t bit_plane) {
     const uint8_t bot_row = (PANEL_HEIGHT/2 - 1) - row;
 
     //choose which bit of each 8-bit channel to use
-    const int bit_index = 7 - bit_plane; // bit_plane 0 => MSB (bit 7)
+    //bit_plane 0 => MSB (bit 7)
+    const int bit_index = 7 - bit_plane;
 
     //disable outputs while shifting
     gpio_put(OE, 1);
@@ -107,46 +146,37 @@ static void shift_row_bitplane(uint8_t row, uint8_t bit_plane) {
     //set address lines for this row
     send_row_address(row);
 
-    //for every column: set data lines (R1,G1,B1,R2,G2,B2) then pulse CLK
+    //shift in data via pio
     for (int col = 0; col < PANEL_WIDTH; ++col) {
-        uint32_t set_mask = 0;
-        //top half pixel at (top_row, col)
-        uint8_t r1 = framebuffer[fbf_rdy][top_row][col][0];
-        uint8_t g1 = framebuffer[fbf_rdy][top_row][col][1];
-        uint8_t b1 = framebuffer[fbf_rdy][top_row][col][2];
+        uint32_t pixel_bits = 0;
 
-        //bottom half pixel at (bot_row, col)
-        uint8_t r2 = framebuffer[fbf_rdy][bot_row][col][0];
-        uint8_t g2 = framebuffer[fbf_rdy][bot_row][col][1];
-        uint8_t b2 = framebuffer[fbf_rdy][bot_row][col][2];
+        // Extract bits for Top (R1, G1, B1)
+        if (framebuffer[fbf_rdy][top_row][col][0] & (1u << bit_index)) pixel_bits |= (1u << 0); // R1
+        if (framebuffer[fbf_rdy][top_row][col][1] & (1u << bit_index)) pixel_bits |= (1u << 1); // G1
+        if (framebuffer[fbf_rdy][top_row][col][2] & (1u << bit_index)) pixel_bits |= (1u << 2); // B1
 
-        if (r1 & (1u << bit_index)) set_mask |= (1u << R1);
-        if (g1 & (1u << bit_index)) set_mask |= (1u << G1);
-        if (b1 & (1u << bit_index)) set_mask |= (1u << B1);
+        // Extract bits for Bottom (R2, G2, B2)
+        if (framebuffer[fbf_rdy][bot_row][col][0] & (1u << bit_index)) pixel_bits |= (1u << 3); // R2
+        if (framebuffer[fbf_rdy][bot_row][col][1] & (1u << bit_index)) pixel_bits |= (1u << 4); // G2
+        if (framebuffer[fbf_rdy][bot_row][col][2] & (1u << bit_index)) pixel_bits |= (1u << 5); // B2
 
-        if (r2 & (1u << bit_index)) set_mask |= (1u << R2);
-        if (g2 & (1u << bit_index)) set_mask |= (1u << G2);
-        if (b2 & (1u << bit_index)) set_mask |= (1u << B2);
-
-        //write the data lines atomically: clear then set
-        gpio_clr_mask(DATA_MASK);
-        if (set_mask) gpio_set_mask(set_mask);
-
-        //pulse clock: rising edge shifts the data into the panel's shift registers
-        gpio_put(CLK, 1);
-        gpio_put(CLK, 0);
+        // Push to PIO FIFO
+        pio_sm_put_blocking(pio, sm, pixel_bits);
     }
 
-    // after shifting all columns, latch the row data into outputs
+    //wait for shift to complete
+    wait_for_pio_idle();
+
+    //after shifting all columns, latch the row data into outputs
     gpio_put(LAT, 1);
-    // short hold to meet panel latch timings
+    //short hold to meet panel latch timings
     sleep_us(1);
     gpio_put(LAT, 0);
 
-    // compute display time weight for this bit plane (LSB -> shortest)
+    //compute display time weight for this bit plane (LSB -> shortest)
     uint32_t weight_us = (uint32_t)LSB_TIME_US << (BCM_BITS - 1 - bit_plane);
 
-    // enable outputs for that duration
+    //enable outputs for that duration
     gpio_put(OE, 0);
     sleep_us(weight_us);
     gpio_put(OE, 1);

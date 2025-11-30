@@ -1,0 +1,12 @@
+.program hub75
+.side_set 1
+
+; PIN MAPPING:
+; OUT pins (6): R1, G1, B1, R2, G2, B2 (Must be contiguous)
+; SIDESET pin (1): CLK
+
+.wrap_target
+    pull block    side 0  ; Pull new pixel data, ensure CLK is Low
+    out pins, 6   side 0  ; Output RGB data (bits 0-5), CLK Low
+    nop           side 1  ; Set CLK high (latches data into panel shift reg)
+.wrap
