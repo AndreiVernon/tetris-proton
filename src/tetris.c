@@ -15,7 +15,7 @@ uint32_t score = 0;
 volatile bool game_over = false;
 Piece active_piece = {0};       //currently active piece
 Piece ghost_piece = {0};        //ghost piece / shadow of active piece
-int held_piece_shape = -1;      //shape of held piece
+int held_piece_shape = INACTIVE;      //shape of held piece
 bool hold_avail = true;         //can hold piece
 int rand_bag[14] = {0};         //bag of upcoming pieces
 int rand_bag_loc = 0;           //index of bag
@@ -38,11 +38,11 @@ const uint8_t piece_masks[7][25] = {
     {0, 0, 0, 1, 1, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},  // S (2)
     {0, 0, 0, 0, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},  // Z (3)
     {0, 0, 0, 1, 1, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},  // T (4)
-    {0, 0, 0, 1, 1, 1, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},  // L (5)
+    {0, 0, 0, 1, 1, 1, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},  // L (5)
     {0, 0, 0, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}   // J (6)
 };  //      ||       ||       || (3x3)
 
-const int8_t rotate_offset_data[4][5][2] = {
+static const int8_t rotate_offset_data[4][5][2] = {
     {{0, 0}, {0, 0}, {0, 0}, {0, 0}, {0, 0}},   //0
     {{0, 0}, {1, 0}, {1, -1}, {0, 2}, {1, 2}},  //R
     {{0, 0}, {0, 0}, {0, 0}, {0, 0}, {0, 0}},   //2
@@ -50,7 +50,7 @@ const int8_t rotate_offset_data[4][5][2] = {
 };
 
 //ccw at even indices, cw at odd indices
-const int8_t rotate_offset_data_i_base[8][2] = {
+static const int8_t rotate_offset_data_i_base[8][2] = {
     {0, -1},    //0->L
     {1, 0},     //0->R
     {-1, 0},    //R->0
@@ -61,7 +61,7 @@ const int8_t rotate_offset_data_i_base[8][2] = {
     {0, 1}      //L->0
 };
 
-const int8_t rotate_offset_data_i_arika[8][5][2] = {
+static const int8_t rotate_offset_data_i_arika[8][5][2] = {
     {{0,0}, {2,0}, {-1,0}, {-1,2}, {2,-1}},   //0->L
     {{0,0}, {-2,0}, {1,0}, {1,2}, {-2,-1}},   //0->R
     {{0,0}, {2,0}, {-1,0}, {2,1}, {-1,-2}},   //R->0
@@ -72,10 +72,12 @@ const int8_t rotate_offset_data_i_arika[8][5][2] = {
     {{0,0}, {-2,0}, {1,0}, {-2,1}, {1,-2}}    //L->0
 };
 
+void gen_rand_bag(bool second_half);
+
 void reset_game()
 {
     //clear the playfield
-    memset(matrix, 0, sizeof(matrix));
+    memset(matrix, EMPTY, sizeof(matrix));
 
     score = 0;
     game_over = false;
@@ -84,7 +86,8 @@ void reset_game()
     memset(&active_piece, 0, sizeof(active_piece));
     memset(&ghost_piece, 0, sizeof(ghost_piece));
 
-    held_piece_shape = -1;
+    active_piece.shape = INACTIVE;
+    held_piece_shape = INACTIVE;
     hold_avail = true;
 
     //set up random bag
@@ -96,6 +99,10 @@ void reset_game()
 
     generation_timer_flag = -1;
     memset(&generation_timer, 0, sizeof(generation_timer));
+
+    gravity_timer_flag = -1;
+    memset(&gravity_timer, 0, sizeof(gravity_timer));
+    soft_drop_active = false;
 }
 
 //check if current piece is colliding with blocks on playfield
@@ -162,11 +169,11 @@ void gen_rand_bag(bool second_half) {
 
     //Fisher-Yates shuffle (uniform sampling)
     for (int i = 6; i > 0; i--) {
-        int j;
+        uint32_t j;
         int limit = UINT32_MAX - (UINT32_MAX % (i + 1));
 
         do {
-            j = rand();
+            j = get_rand_32();
         } while (j >= limit);
 
         j %= (i + 1);
@@ -317,7 +324,7 @@ void hard_drop(bool ghost) {
 //update ghost piece
 void update_ghost() {
     ghost_piece = active_piece;
-    ghost_piece.shape = GHOST;
+    if (ghost_piece.shape != INACTIVE) ghost_piece.shape = GHOST;
     hard_drop(true);
 }
 
@@ -395,6 +402,22 @@ void check_lines() {
     }
 }
 
+//drop piece slowly
+//returns true if piece ended up touching surface
+bool drop_piece(int drop_count) {
+    int dropped;
+    for (dropped = 0; dropped < drop_count; dropped++) {
+        active_piece.y--;
+
+        if (is_colliding()) {
+            active_piece.y++;
+            return true;
+        }
+    }
+    
+    return false;
+}
+
 //add garbage in multiplayer moded
 void add_garbage() {
     //gonna have to come up with garbage shapes
@@ -416,6 +439,8 @@ bool oneshot_cb(repeating_timer_t *rt) {
 }
 
 void update_generation() {
+    active_piece.shape = INACTIVE;
+
     //hold piece
     if (cur_inputs.hold && hold_avail) {
         cancel_repeating_timer(&generation_timer);
@@ -454,22 +479,6 @@ bool gravity_cb(repeating_timer_t *rt) {
 void cancel_gravity() {
     cancel_repeating_timer(&gravity_timer);
     gravity_timer_flag = -1;
-}
-
-//drop piece slowly
-//returns true if piece ended up touching surface
-bool drop_piece(int drop_count) {
-    int dropped;
-    for (dropped = 0; dropped < drop_count; dropped++) {
-        active_piece.y--;
-
-        if (is_colliding()) {
-            active_piece.y++;
-            return true;
-        }
-    }
-    
-    return false;
 }
 
 void update_falling() {
@@ -539,11 +548,12 @@ void update_falling() {
 }
 
 void update_lock() {
-    //cancel gravity timer
+    cur_phase = CLEAR;
 }
 
 void update_clear() {
-
+    lock_piece();
+    cur_phase = GENERATION;
 }
 
 void update_game() {
@@ -588,7 +598,6 @@ int game_loop() {
         render_frame();
         while (!frame_ready) tight_loop_contents();
         frame_ready = false;
-        //display_frame here (change which framebuffer display.c reads from)
     }
 
     //game over stuff

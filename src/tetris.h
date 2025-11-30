@@ -15,6 +15,7 @@
 #define GARBAGE 7
 #define EMPTY 67
 #define GHOST 61
+#define INACTIVE -1
 
 typedef struct {
     int shape;          //shape id, 0-6

@@ -3,9 +3,9 @@ X-piece data structure
 X-playfield matrix data structure
 X-spawn piece
 X-random piece selection / 7-bag logic
-!!-hold piece logic
---todo: can't hold and unhold a piece before a new one locks
----use a "hold available" var and reset it during a lock
+X-hold piece logic
+X--todo: can't hold and unhold a piece before a new one locks
+X---use a "hold available" var and reset it during a lock
 X-collision detection
 X-oob detection
 X-add locked piece to playfield matrix
@@ -16,16 +16,15 @@ X-rotate piece
 X--matrix rotation
 X--rotation offset tables
 X---derive Arika wall kick data for I piece
--gravity
-!!-soft drop piece
---todo: soft drop doesn't move down by one, instead it amplifies gravity by 20x
+X-gravity
+X!!-soft drop piece
+X--todo: soft drop doesn't move down by one, instead it amplifies gravity by 20x
 X-hard drop piece
--delayed auto shift / auto repeat (behaviour when holding movement key)
---implement in move l/r
---implement in soft drop
---determine behaviour that stops/resets movement
----only when no longer pressing
----continues to next piece after lock down if still pressed
+X-delayed auto shift / auto repeat (behaviour when holding movement key)
+X--implement in move l/r
+X--determine behaviour that stops/resets movement
+X---only when no longer pressing
+X---continues to next piece after lock down if still pressed
 -calculate time before piece locks
 --0.5s lock delay when gravity less than 20G?
 -pause menu
@@ -103,9 +102,7 @@ Input:
 --pcb or custom bought connector
 --choose ports that aren't used for other things
 -initiate connection / detect whether plugged in
--input polling / handling
--convert input reading to functions the game carries out
--convert input reading to functions for menus
+X-input polling / handling
 
 Multiplayer Connection:
 -physical connection

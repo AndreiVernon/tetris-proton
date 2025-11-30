@@ -23,12 +23,16 @@ void init_inputs() {
     memset(&raw_inputs, 0, sizeof(raw_inputs));
     memset(&cur_inputs, 0, sizeof(cur_inputs));
     left_buf = right_buf = last_move_dir = up_buf = a_buf = b_buf = start_buf = select_buf = 0;
+
+    //proton buttons
+    gpio_init_mask(1 << 21 | 1 << 26);
+    sio_hw->gpio_oe_clr = 1 << 21 | 1 << 26;
 }
 
-void read_raw_inputs() {
-    //get those inputs dammit!
-    //set values in cur_inputs
-    raw_inputs.left = true;
+//set values in raw_inputs
+void read_raw_inputs() {    
+    raw_inputs.left = gpio_get(26);
+    raw_inputs.right = gpio_get(21);
 }
 
 

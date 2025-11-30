@@ -42,7 +42,7 @@ void render_menu() {
 }
 
 void render_background() {
-    memcpy(framebuffer, background, sizeof(framebuffer));
+    memcpy(framebuffer[!fbf_rdy], background, sizeof(framebuffer[!fbf_rdy]));
 }
 
 void set_block_color(uint8_t *arr, uint8_t px, bool dim) {
@@ -97,10 +97,10 @@ void render_matrix() {
             // || frame_y < 0 || frame_x < 0
 
             //draw 4 pixels per block
-            set_block_color(framebuffer[frame_y][frame_x], matrix[y][x], true);
-            set_block_color(framebuffer[frame_y][frame_x + 1], matrix[y][x], true);
-            set_block_color(framebuffer[frame_y + 1][frame_x], matrix[y][x], true);
-            set_block_color(framebuffer[frame_y + 1][frame_x + 1], matrix[y][x], true);
+            set_block_color(framebuffer[!fbf_rdy][frame_y][frame_x], matrix[y][x], true);
+            set_block_color(framebuffer[!fbf_rdy][frame_y][frame_x + 1], matrix[y][x], true);
+            set_block_color(framebuffer[!fbf_rdy][frame_y + 1][frame_x], matrix[y][x], true);
+            set_block_color(framebuffer[!fbf_rdy][frame_y + 1][frame_x + 1], matrix[y][x], true);
         }
     }
 }
@@ -109,7 +109,7 @@ void render_matrix() {
 //sets color based on cur_piece.shape
 void render_piece(Piece cur_piece, int x_offset, int y_offset) {
     //-1 means piece is hidden
-    if (cur_piece.shape == -1) return;
+    if (cur_piece.shape == INACTIVE) return;
 
     uint8_t col[3];
     set_block_color(col, cur_piece.shape, false);
@@ -124,10 +124,10 @@ void render_piece(Piece cur_piece, int x_offset, int y_offset) {
             if (frame_y >= PANEL_HEIGHT || frame_x >= PANEL_WIDTH || frame_y < 0 || frame_x < 0) continue;
 
             //draw 4 pixels per block
-            memcpy(framebuffer[frame_y][frame_x], col, 3);
-            memcpy(framebuffer[frame_y][frame_x + 1], col, 3);
-            memcpy(framebuffer[frame_y + 1][frame_x], col, 3);
-            memcpy(framebuffer[frame_y + 1][frame_x + 1], col, 3);
+            memcpy(framebuffer[!fbf_rdy][frame_y][frame_x], col, 3);
+            memcpy(framebuffer[!fbf_rdy][frame_y][frame_x + 1], col, 3);
+            memcpy(framebuffer[!fbf_rdy][frame_y + 1][frame_x], col, 3);
+            memcpy(framebuffer[!fbf_rdy][frame_y + 1][frame_x + 1], col, 3);
         }
     }
 }
@@ -149,7 +149,7 @@ void init_piece_render(Piece *new_piece, int new_shape) {
 }
 
 void render_hold() {
-    if (held_piece_shape == -1) return;
+    if (held_piece_shape == INACTIVE) return;
 
     Piece held_piece;
     init_piece_render(&held_piece, held_piece_shape);
@@ -205,4 +205,6 @@ void render_frame() {
     render_next();
     // render_score();
     // render_time();
+
+    fbf_rdy = !fbf_rdy;
 }

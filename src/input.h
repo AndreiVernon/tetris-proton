@@ -10,6 +10,8 @@ typedef struct {
 
 
 extern InputState cur_inputs;
+
+void init_inputs();
 void get_inputs();
 
 #endif
