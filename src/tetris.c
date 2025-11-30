@@ -118,7 +118,7 @@ bool is_colliding(bool ghost) {
             //check every active block in piece mask
             if (cur_piece.mask[y * cur_piece.size + x]) {
                 //check for oob
-                if (cur_piece.x + x < 0 || cur_piece.x + x >= M_WIDTH || cur_piece.y + y < 0 || active_piece.y + y >= M_HEIGHT)
+                if (cur_piece.x + x < 0 || cur_piece.x + x >= M_WIDTH || cur_piece.y + y < 0 || active_piece.y + y >= M_HEIGHT+5)
                     return true;
 
                 //check for collision
@@ -603,8 +603,6 @@ int game_loop() {
         get_inputs();
 
         update_game();
-
-        matrix[21][0] = hold_avail ? GARBAGE : EMPTY;
 
         render_frame();
         while (!frame_ready) tight_loop_contents();
