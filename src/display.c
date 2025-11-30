@@ -22,12 +22,13 @@
 // ------------------------------------------------------------------------
 
 //assigning GPIOs to data cable ports for adafruit display ---> adjust numbers as needed
-#define R1 16   //red data for top half
-#define G1 10   //green data for top half
-#define B1 17   //blue data for top half
-#define R2 18   //red data for bottom half
-#define G2 11   //green data for bottom half
-#define B2 19   //blue data for bottom half
+#define DATA_BASE_PIN 2
+#define R1 (DATA_BASE_PIN + 0)   //red data for top half
+#define G1 (DATA_BASE_PIN + 1)   //green data for top half
+#define B1 (DATA_BASE_PIN + 2)   //blue data for top half
+#define R2 (DATA_BASE_PIN + 3)   //red data for bottom half
+#define G2 (DATA_BASE_PIN + 4)   //green data for bottom half
+#define B2 (DATA_BASE_PIN + 5)   //blue data for bottom half
 #define A 20    //row select bit 0
 #define B 13    //row select bit 1
 #define C 9    //row select bit 2 //was 21
@@ -139,8 +140,11 @@ static void shift_row_bitplane(uint8_t row, uint8_t bit_plane) {
 
     // after shifting all columns, latch the row data into outputs
     gpio_put(LAT, 1);
+
     // short hold to meet panel latch timings
-    sleep_us(1);
+    //sleep_us(1);
+    busy_wait_at_least_cycles(150 * 0.3); //150 cycles = 1us
+
     gpio_put(LAT, 0);
 
     // compute display time weight for this bit plane (LSB -> shortest)
