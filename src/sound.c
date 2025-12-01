@@ -7,7 +7,7 @@
 
 //title song + 3 game songs + highscore song (can change to diff ending song if desired)
 #include "title.h"
-// #include "songA.h"
+#include "songA.h"
 // #include "songB.h"
 // #include "songC.h"
 // #include "tetoris.h"
@@ -19,7 +19,7 @@
 
 #include "silence.h"
 
-const uint8_t *currsong = TITLE_DATA;
+const uint8_t *currsong = SONGA_DATA;
 const uint8_t *currsfx = SILENCE_DATA;  //just empty so it doesn't read bad just in case
 
 int currsongid = 0;  //have these be to see if song was changed
@@ -41,7 +41,7 @@ int sfxbufferpos = 0;
 int songid = 6; //is 1/2/3 for A/B/C 4 tetoris and 5 gameend (could add almost losing)
 int sfxid = 0;  //0 if none, 1: clear, 2: 4 line clear, 3: gameover
 
-int songlength = TITLE_DATA_LENGTH;  //start with title initially
+int songlength = SONGA_DATA_LENGTH;  //start with title initially
 int song_dma_chan;
 int sfxlength = 0;  //and no sfx initially
 int sfx_dma_chan;
@@ -144,9 +144,9 @@ void song_select() {
         songlength = TITLE_DATA_LENGTH;
         currsongid = 0;
     } else if (songid == 1) {
-    //     currsong = SONGA_DATA;
-    //     songlength = SONGA_DATA_LENGTH;
-    //     currsongid = 1;
+        currsong = SONGA_DATA;
+        songlength = SONGA_DATA_LENGTH;
+        currsongid = 1;
     // } else if (songid == 2) {
     //     currsong = SONGB_DATA;
     //     songlength = SONGB_DATA_LENGTH;
