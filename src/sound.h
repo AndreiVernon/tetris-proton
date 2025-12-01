@@ -14,8 +14,10 @@
 #define CLEAR4_SFX 2
 #define GAMEOVER_SFX 3
 
+extern int songid;
+extern int sfxid;
 
 void init_audio();
-void play_audio(int id, int is_sfx);
+void play_audio();
 
 #endif

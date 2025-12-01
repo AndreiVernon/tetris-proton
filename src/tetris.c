@@ -563,7 +563,7 @@ void update_lock() {
 
 void update_clear() {
     lock_piece();
-    play_audio(CLEAR_SFX, true);
+    // play_audio(CLEAR_SFX, true);
     cur_phase = GENERATION;
 }
 
@@ -598,7 +598,7 @@ void update_game() {
 
 int game_loop() {
     reset_game();
-    play_audio(SONGA_SONG, false);
+    // play_audio(SONGA_SONG, false);
 
     //game start stuff
 
@@ -613,7 +613,7 @@ int game_loop() {
     }
 
     //game over stuff
-    play_audio(GAMEOVER_SFX, true);
+    // play_audio(GAMEOVER_SFX, true);
 
     while (true) render_frame();
 
