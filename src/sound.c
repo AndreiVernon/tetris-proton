@@ -135,9 +135,6 @@ void init_pwm_audio() {
     irq_set_enabled(PWM_IRQ_WRAP_0, 1);
 
     pwm_hw->slice[pwm_gpio_to_slice_num(36)].csr = (1 << 0);
-
-    init_song_dma();
-    init_sfx_dma();
 }
 
 
