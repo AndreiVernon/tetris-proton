@@ -6,6 +6,7 @@
 #include "tetris.h"
 #include "graphics.h"
 #include "input.h"
+#include "sound.h"
 
 #define GENERATION_DELAY 0.1  //in s
 #define GRAVITY_DELAY 0.4 //secs to fall one row
@@ -562,6 +563,7 @@ void update_lock() {
 
 void update_clear() {
     lock_piece();
+    play_audio(CLEAR_SFX, true);
     cur_phase = GENERATION;
 }
 
@@ -596,6 +598,7 @@ void update_game() {
 
 int game_loop() {
     reset_game();
+    play_audio(SONGA_SONG, false);
 
     //game start stuff
 
@@ -610,6 +613,7 @@ int game_loop() {
     }
 
     //game over stuff
+    play_audio(GAMEOVER_SFX, true);
 
     while (true) render_frame();
 
