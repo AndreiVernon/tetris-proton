@@ -5,16 +5,25 @@
 #include "graphics.h"
 #include "sound.h"
 
+// int main() {
+//     stdio_init_all();
+//     display_init();
+//     init_inputs();
+//     init_audio();
+
+//     multicore_launch_core1(display_loop);
+//     init_frame_timer();
+
+//     game_loop();
+
+//     return 0;
+// }
+
 int main() {
     stdio_init_all();
-    display_init();
-    init_inputs();
     init_audio();
-
-    multicore_launch_core1(display_loop);
-    init_frame_timer();
-
-    game_loop();
+    play_audio(CLEAR_SFX, true);
+    while (1) tight_loop_contents();
 
     return 0;
 }

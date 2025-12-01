@@ -28,25 +28,26 @@
 #define REPEAT_NUM 8
 
 //buffers that store processed audio
-uint8_t audiobuffer[2][BUFFER_SIZE];
+static uint8_t audiobuffer[2][BUFFER_SIZE];
 
 //current position in audio file
-int song_pos = 0;
-int sfx_pos = 0;
+static int song_pos = 0;
+static int sfx_pos = 0;
 
 //current audio track pointers and lengths
-const uint8_t *curr_song = SILENCE_DATA;
-const uint8_t *curr_sfx = SILENCE_DATA;
-int curr_song_len = SILENCE_DATA_LENGTH;
-int curr_sfx_len = SILENCE_DATA_LENGTH;
+static const uint8_t *curr_song = SILENCE_DATA;
+static const uint8_t *curr_sfx = SILENCE_DATA;
+static int curr_song_len = SILENCE_DATA_LENGTH;
+static int curr_sfx_len = SILENCE_DATA_LENGTH;
 
 //audio state index (see audio_track structs below)
-int song_id = 0;
-int sfx_id = 0;
-bool active_buffer = 0; //which buffer is currently being played by DMA
+static int song_id = 0;
+static int sfx_id = 0;
+static bool active_buffer = 0; //which buffer is currently being played by DMA
 
 //DMA channel
-int audio_dma_chan;
+static int dma_chan;
+static dma_channel_config dma_config;
 
 typedef struct {
     const uint8_t *data;
@@ -54,7 +55,7 @@ typedef struct {
 } audio_track;
 
 //0: none, 1: songA, 2: songB, 3: songC, 4: tetoris, 5: end, 6: title
-audio_track songs[] = {
+static const audio_track songs[] = {
     {SILENCE_DATA, SILENCE_DATA_LENGTH},
     {SONGA_DATA, SONGA_DATA_LENGTH},
     #if !FAST_MODE
@@ -67,7 +68,7 @@ audio_track songs[] = {
 };
 
 //0: none, 1: clear, 2: 4-line clear, 3: gameover
-audio_track sfx[] = {
+static const audio_track sfx[] = {
     {SILENCE_DATA, SILENCE_DATA_LENGTH},
     {CLEAR_DATA, CLEAR_DATA_LENGTH},
     {CLEAR4_DATA, CLEAR4_DATA_LENGTH},
@@ -75,7 +76,7 @@ audio_track sfx[] = {
 };
 
 //mix audio and fill the specified buffer
-void fill_audio_buffer(int buffer_index) {
+static void fill_audio_buffer(int buffer_index) {
     for (int i = 0; i < BUFFER_SIZE; i++) {
         //get song sample (loop if needed)
         uint8_t song_sample = curr_song[song_pos];
@@ -105,30 +106,7 @@ void fill_audio_buffer(int buffer_index) {
     }
 }
 
-//DMA interrupt handler
-//fills the buffer that just finished playing
-void dma_audio_handler() {
-    //clear interrupt
-    dma_channel_acknowledge_irq0(audio_dma_chan);
-    
-    //switch to the other buffer
-    active_buffer = !active_buffer;
-    
-    //fill the buffer that just became available
-    fill_audio_buffer(active_buffer);
-    
-    //reconfigure DMA to use the other buffer
-    dma_channel_configure(
-        audio_dma_chan,
-        NULL,  //keep existing config
-        &pwm_hw->slice[pwm_gpio_to_slice_num(AUDIO_PIN)].cc,
-        audiobuffer[active_buffer],
-        BUFFER_SIZE,
-        true    //start immediately
-    );
-}
-
-void init_audio_pwm() {
+static void init_audio_pwm() {
     //configure GPIO for PWM
     gpio_set_function(AUDIO_PIN, GPIO_FUNC_PWM);
     
@@ -144,30 +122,45 @@ void init_audio_pwm() {
     pwm_set_enabled(pwm_gpio_to_slice_num(AUDIO_PIN), true);
 }
 
-void init_audio_dma() {
+//DMA interrupt handler
+//fills the buffer that just finished playing
+static void dma_audio_handler() {
+    //clear interrupt
+    dma_channel_acknowledge_irq0(dma_chan);
+
+    //switch to the other buffer
+    active_buffer = !active_buffer;
+
+    dma_channel_set_read_addr(dma_chan, audiobuffer[active_buffer], true);
+    
+    //fill the buffer that just became available
+    fill_audio_buffer(!active_buffer);
+}
+
+static void init_audio_dma() {
     //fill both buffers with initial audio
     fill_audio_buffer(0);
     fill_audio_buffer(1);
     
     //claim DMA channel
-    audio_dma_chan = dma_claim_unused_channel(true);
+    dma_chan = dma_claim_unused_channel(true);
     
     //configure DMA for PWM transfer
-    dma_channel_config config = dma_channel_get_default_config(audio_dma_chan);
-    channel_config_set_transfer_data_size(&config, DMA_SIZE_8);
-    channel_config_set_read_increment(&config, true);
-    channel_config_set_write_increment(&config, false);
-    channel_config_set_dreq(&config, DREQ_PWM_WRAP0 + pwm_gpio_to_slice_num(AUDIO_PIN));
+    dma_config = dma_channel_get_default_config(dma_chan);
+    channel_config_set_transfer_data_size(&dma_config, DMA_SIZE_8);
+    channel_config_set_read_increment(&dma_config, true);
+    channel_config_set_write_increment(&dma_config, false);
+    channel_config_set_dreq(&dma_config, DREQ_PWM_WRAP0 + pwm_gpio_to_slice_num(AUDIO_PIN));
     
     //setup DMA completion interrupt
-    dma_channel_set_irq0_enabled(audio_dma_chan, true);
+    dma_channel_set_irq0_enabled(dma_chan, true);
     irq_set_exclusive_handler(DMA_IRQ_0, dma_audio_handler);
     irq_set_enabled(DMA_IRQ_0, true);
     
     //configure and start DMA with first buffer
     dma_channel_configure(
-        audio_dma_chan,
-        &config,
+        dma_chan,
+        &dma_config,
         &pwm_hw->slice[pwm_gpio_to_slice_num(AUDIO_PIN)].cc,
         audiobuffer[0],
         BUFFER_SIZE,
