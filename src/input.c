@@ -3,6 +3,9 @@
 #include "input.h"
 
 #define DAS_FRAMES 18
+#define CLK_PIN 18
+#define LAT_PIN 19
+#define D0_PIN 20
 
 typedef struct {
     bool up, down, left, right;
@@ -35,11 +38,17 @@ void init_inputs() {
         gpio_pull_up(i);
         gpio_set_dir(i, false);
     }
+
+    // controller gpio
+    gpio_init_mask(0b111<<18);
+    gpio_set_dir(18 , true);
+    gpio_set_dir(19 , true);
+    gpio_set_dir(20 , false);
 }
 
 //set values in raw_inputs
 void read_raw_inputs() {
-    int but1 = !gpio_get(33);
+    /* int but1 = !gpio_get(33);
     int but2 = !gpio_get(34);
     int but3 = !gpio_get(35);
 
@@ -53,7 +62,28 @@ void read_raw_inputs() {
     } else {
         raw_inputs.left = gpio_get(26);
         raw_inputs.right = gpio_get(21);
+    } */
+
+    //controller isr
+    sio_hw->gpio_togl = 1 << LAT_PIN;
+    sleep_us(12);
+    sio_hw->gpio_togl = 1 << LAT_PIN;
+    bool buttons_array[8];
+    for(int i = 0; i < 8; i++) {
+        sleep_us(6);
+        sio_hw->gpio_togl = 1 << CLK_PIN;
+        buttons_array[i] = !(sio_hw->gpio_out | (1 << D0_PIN));
+        sleep_us(6);
+        sio_hw->gpio_togl = 1 << CLK_PIN;
     }
+    raw_inputs.a = buttons_array[0];
+    raw_inputs.b = buttons_array[1];
+    raw_inputs.select = buttons_array[2];
+    raw_inputs.start = buttons_array[3];
+    raw_inputs.up = buttons_array[4];
+    raw_inputs.down = buttons_array[5];
+    raw_inputs.left = buttons_array[6];
+    raw_inputs.right = buttons_array[7];
 }
 
 
