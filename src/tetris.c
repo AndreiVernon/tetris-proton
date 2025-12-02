@@ -390,6 +390,7 @@ void shift_lines(int row, int amount) {
 
 //checks for completed lines and removes them
 void check_lines() {
+    int cleared = 0;
     for (int y = 0; y < M_HEIGHT; y++) {
         int cleared_cnt = 0;
 
@@ -403,9 +404,13 @@ void check_lines() {
         //line has been cleared
         if (cleared_cnt == M_WIDTH) {
             shift_lines(y, -1);
+            cleared++;
             //TODO: score up
         }
     }
+
+    if (cleared >= 4) play_audio(CLEAR4_SFX, true);
+    else if (cleared > 0) play_audio(CLEAR_SFX, true);
 }
 
 //drop piece slowly
@@ -563,7 +568,9 @@ void update_lock() {
 
 void update_clear() {
     lock_piece();
-    play_audio(CLEAR_SFX, true);
+
+    check_lines();
+
     cur_phase = GENERATION;
 }
 
