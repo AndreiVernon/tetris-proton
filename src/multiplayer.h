@@ -15,7 +15,7 @@ typedef enum {
 } mp_msg_t;
 
 //init uart hardware
-void multiplayer_uart_init(uint baudrate);
+void multiplayer_uart_init();
 //send a single-message code
 bool multiplayer_send_msg(mp_msg_t msg);
 //send a message with an extra 1-byte argument

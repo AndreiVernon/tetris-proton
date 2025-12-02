@@ -13,10 +13,11 @@
 
 #define HANDSHAKE_RETRY_MS 100
 #define HANDSHAKE_TOTAL_TIMEOUT_MS 3000
+#define DEFAULT_BAUD 115200
 
 //init uart hardware
-void multiplayer_uart_init(uint baudrate) {
-	uart_init(UART_INST, baudrate);
+void multiplayer_uart_init() {
+	uart_init(UART_INST, DEFAULT_BAUD);
 	gpio_set_function(UART_TX_PIN, GPIO_FUNC_UART);
 	gpio_set_function(UART_RX_PIN, GPIO_FUNC_UART);
 

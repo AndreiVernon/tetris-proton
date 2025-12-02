@@ -35,6 +35,7 @@ typedef enum {
 extern uint8_t matrix[M_HEIGHT][M_WIDTH];
 extern uint32_t score;
 extern volatile bool game_over;
+extern bool multiplayer;
 extern Piece active_piece;      //currently active piece
 extern Piece ghost_piece;       //ghost piece / shadow of active piece
 extern int held_piece_shape;    //shape of held piece

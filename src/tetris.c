@@ -15,6 +15,7 @@
 uint8_t matrix[M_HEIGHT][M_WIDTH] = {0};
 uint32_t score = 0;
 volatile bool game_over = false;
+bool multiplayer = false;
 Piece active_piece = {0};       //currently active piece
 Piece ghost_piece = {0};        //ghost piece / shadow of active piece
 int held_piece_shape = INACTIVE;      //shape of held piece
@@ -621,6 +622,7 @@ int game_loop() {
 
     //game over stuff
     play_audio(GAMEOVER_SFX, true);
+    play_audio(SILENCE_SONG, false);
 
     while (true) render_frame();
 
