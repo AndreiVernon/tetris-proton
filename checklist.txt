@@ -103,10 +103,13 @@ Audio:
 ---mix = ((sa - 128) + (sb - 128)) / 2;
 
 Input:
--physical connection for NES controller to proton
---pcb or custom bought connector
---choose ports that aren't used for other things
--initiate connection / detect whether plugged in
+X-physical connection for NES controller to proton
+X--pcb or custom bought connector
+X--choose ports that aren't used for other things
+-detect whether plugged in
+--controller disconnected = D0 pin 20 low
+--therefore every button will be read as pressed
+--if every button is pressed, we can say that controller's not working
 X-input polling / handling
 
 Multiplayer Connection:

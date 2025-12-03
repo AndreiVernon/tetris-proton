@@ -9,8 +9,8 @@
 #include "sound.h"
 
 #define GENERATION_DELAY 0.1  //in s
-#define GRAVITY_DELAY 0.4 //secs to fall one row
-#define GRAVITY_SOFT_MULT 10 //how much soft drop multiplies gravity by
+#define GRAVITY_DELAY 0.5 //secs to fall one row
+#define GRAVITY_SOFT_MULT 20 //how much soft drop multiplies gravity by
 
 uint8_t matrix[M_HEIGHT][M_WIDTH] = {0};
 uint32_t score = 0;
@@ -120,7 +120,7 @@ bool is_colliding(bool ghost) {
             //check every active block in piece mask
             if (cur_piece.mask[y * cur_piece.size + x]) {
                 //check for oob
-                if (cur_piece.x + x < 0 || cur_piece.x + x >= M_WIDTH || cur_piece.y + y < 0 || active_piece.y + y >= M_HEIGHT+5)
+                if (cur_piece.x + x < 0 || cur_piece.x + x >= M_WIDTH || cur_piece.y + y < 0 || cur_piece.y + y >= M_HEIGHT+5)
                     return true;
 
                 //check for collision
@@ -250,34 +250,44 @@ void rotate(bool cw) {
     if (active_piece.shape == O_PIECE) return;
 
     uint8_t mask_old[25];
-    memcpy(mask_old, active_piece.mask, active_piece.size * active_piece.size);
     int size = active_piece.size;
+    memcpy(mask_old, active_piece.mask, sizeof(mask_old));
+    memset(active_piece.mask, 0, sizeof(active_piece.mask));
 
     //perform matrix rotation on piece mask
-    if (cw) {
-        for (int r = 0; r < size; r++) {
-            for (int c = 0; c < size; c++) {
-                active_piece.mask[c * size + (size - 1 - r)] = mask_old[r * size + c];
+    for (int y = 0; y < size; y++) {
+        for (int x = 0; x < size; x++) {
+
+            uint8_t val = mask_old[y * size + x];
+            if (!val) continue;
+
+            //this is flipped from what other sources will say
+            //because y=0 is bottom instead of top
+            int new_x, new_y;
+            if (cw) {
+                new_x = y;
+                new_y = (size - 1) - x;
+            } else {
+                new_x = (size - 1) - y;
+                new_y = x;
             }
-        }
-    } else {
-        for (int r = 0; r < size; r++) {
-            for (int c = 0; c < size; c++) {
-                active_piece.mask[(size - 1 - c) * size + r] = mask_old[r * size + c];
-            }
+
+            active_piece.mask[new_y * size + new_x] = val;
         }
     }
     
-    int rotation_target = (active_piece.rotation + (cw ? 1 : -1)) % 4;
+    int rotation_target = (active_piece.rotation + (cw ? 1 : -1) + 4) % 4;
     int x_old = active_piece.x;
     int y_old = active_piece.y;
     bool success = false;
 
     //add piece offsets
     if (active_piece.shape == I_PIECE) {
+        int table_index = active_piece.rotation*2 + cw;
+
         for (int i = 0; i < 5; i++) {
-            active_piece.x = x_old + rotate_offset_data_i_base[active_piece.rotation*2 + cw][0] + rotate_offset_data_i_arika[active_piece.rotation*2 + cw][i][0];
-            active_piece.y = y_old + rotate_offset_data_i_base[active_piece.rotation*2 + cw][1] + rotate_offset_data_i_arika[active_piece.rotation*2 + cw][i][1];
+            active_piece.x = x_old + rotate_offset_data_i_base[table_index][0] + rotate_offset_data_i_arika[table_index][i][0];
+            active_piece.y = y_old + rotate_offset_data_i_base[table_index][1] + rotate_offset_data_i_arika[table_index][i][1];
             
             if (!is_colliding(false)) {
                 success = true;
@@ -300,7 +310,7 @@ void rotate(bool cw) {
     if (!success) {
         active_piece.x = x_old;
         active_piece.y = y_old;
-        memcpy(active_piece.mask, mask_old, active_piece.size * active_piece.size);
+        memcpy(active_piece.mask, mask_old, sizeof(active_piece.mask));
         return;
     }
 
@@ -534,6 +544,7 @@ void update_falling() {
 
     //rotation
     if (cur_inputs.rot_left || cur_inputs.rot_right) {
+        //cw = true for rightwards rot
         rotate(cur_inputs.rot_right);
     }
 
