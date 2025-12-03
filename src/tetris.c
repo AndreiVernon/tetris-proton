@@ -615,11 +615,24 @@ void update_game() {
 
 };
 
+void mp_test() {
+    while (1) {
+        get_inputs();
+
+        //TODO
+
+        render_frame();
+        sleep_ms(50);
+    }
+}
+
 int game_loop() {
     reset_game();
     play_audio(SONGA_SONG, false);
 
     //game start stuff
+
+    if (multiplayer) mp_test();
 
     while (!game_over) {
         get_inputs();
