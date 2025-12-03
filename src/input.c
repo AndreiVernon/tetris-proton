@@ -3,79 +3,55 @@
 #include "input.h"
 
 #define DAS_FRAMES 18
+
 #define CLK_PIN 18
 #define LAT_PIN 19
 #define D0_PIN 20
 
-typedef struct {
-    bool up, down, left, right;
-    bool a, b;
-    bool select, start;
-} RawInputState;
-
-static RawInputState raw_inputs = {0};
+RawInputState raw_inputs = {0};
 InputState cur_inputs = {0};
 
 static uint32_t left_buf, right_buf;
 static bool last_move_dir; //0 = left, 1 = right
-static uint8_t up_buf, a_buf, b_buf, start_buf, select_buf;
+static uint8_t down_buf, a_buf, b_buf, start_buf, select_buf;
 
 //init gpio and such
 //set all buffer variables to 0
 void init_inputs() {
     memset(&raw_inputs, 0, sizeof(raw_inputs));
     memset(&cur_inputs, 0, sizeof(cur_inputs));
-    left_buf = right_buf = last_move_dir = up_buf = a_buf = b_buf = start_buf = select_buf = 0;
-
-    //proton buttons
-    gpio_init_mask(1 << 21 | 1 << 26);
-    gpio_set_dir(21, false);
-    gpio_set_dir(26, false);
-
-    //external buttons
-    for (int i = 33; i < 36; i++) {
-        gpio_init(i);
-        gpio_pull_up(i);
-        gpio_set_dir(i, false);
-    }
+    left_buf = right_buf = last_move_dir = down_buf = a_buf = b_buf = start_buf = select_buf = 0;
 
     // controller gpio
-    gpio_init_mask(0b111<<18);
-    gpio_set_dir(18 , true);
-    gpio_set_dir(19 , true);
-    gpio_set_dir(20 , false);
+    gpio_init_mask(0b111 << 18);
+    gpio_set_dir(18, true);
+    gpio_set_dir(19, true);
+    gpio_set_dir(20, false);
 }
 
 //set values in raw_inputs
 void read_raw_inputs() {
-    /* int but1 = !gpio_get(33);
-    int but2 = !gpio_get(34);
-    int but3 = !gpio_get(35);
-
-    raw_inputs.start = but1;
-    raw_inputs.up = but2;
-    //raw_inputs.down = but3;
-
-    if (but3) {
-        raw_inputs.a = gpio_get(26);
-        raw_inputs.b = gpio_get(21);
-    } else {
-        raw_inputs.left = gpio_get(26);
-        raw_inputs.right = gpio_get(21);
-    } */
-
-    //controller isr
-    sio_hw->gpio_togl = 1 << LAT_PIN;
+    gpio_put(LAT_PIN, 1);
     sleep_us(12);
-    sio_hw->gpio_togl = 1 << LAT_PIN;
+    gpio_put(LAT_PIN, 0);
+
     bool buttons_array[8];
-    for(int i = 0; i < 8; i++) {
+    buttons_array[0] = !gpio_get(D0_PIN);
+    sleep_us(6);
+
+    for(int i = 1; i < 8; i++) {
+        gpio_put(CLK_PIN, 1);
         sleep_us(6);
-        sio_hw->gpio_togl = 1 << CLK_PIN;
-        buttons_array[i] = !(sio_hw->gpio_out | (1 << D0_PIN));
+        gpio_put(CLK_PIN, 0);
+
+        buttons_array[i] = !gpio_get(D0_PIN);
         sleep_us(6);
-        sio_hw->gpio_togl = 1 << CLK_PIN;
     }
+
+    gpio_put(CLK_PIN, 1);
+    sleep_us(6);
+    gpio_put(CLK_PIN, 0);
+
     raw_inputs.a = buttons_array[0];
     raw_inputs.b = buttons_array[1];
     raw_inputs.select = buttons_array[2];
@@ -145,10 +121,10 @@ void get_inputs(void) {
     read_raw_inputs();
 
     //no processing
-    cur_inputs.soft_drop = raw_inputs.down;
+    cur_inputs.soft_drop = raw_inputs.up;
 
     //hold and release
-    up_buf     = ((up_buf     << 1) | raw_inputs.up)     & 0b111;
+    down_buf     = ((down_buf     << 1) | raw_inputs.down)     & 0b111;
     a_buf      = ((a_buf      << 1) | raw_inputs.a)      & 0b111;
     b_buf      = ((b_buf      << 1) | raw_inputs.b)      & 0b111;
     start_buf  = ((start_buf  << 1) | raw_inputs.start)  & 0b111;
@@ -156,7 +132,7 @@ void get_inputs(void) {
 
     cur_inputs.rot_left  = edge_activated_u8(b_buf);
     cur_inputs.rot_right = edge_activated_u8(a_buf);
-    cur_inputs.hard_drop = edge_activated_u8(up_buf);
+    cur_inputs.hard_drop = edge_activated_u8(down_buf);
     cur_inputs.hold      = edge_activated_u8(start_buf);
     cur_inputs.pause     = edge_activated_u8(select_buf);
 

@@ -29,14 +29,14 @@
 #define R2 (DATA_BASE_PIN + 3)   //red data for bottom half
 #define G2 (DATA_BASE_PIN + 4)   //green data for bottom half
 #define B2 (DATA_BASE_PIN + 5)   //blue data for bottom half
-#define A 20    //row select bit 0
-#define B 13    //row select bit 1
-#define C 9    //row select bit 2 //was 21
-#define D 14    //row select bit 3
-#define E 12    //row select bit 4
-#define CLK 22  //clock (shift register)
-#define LAT 15  //stores shifted data into output register --> latch
-#define OE 23   //active low output enable
+#define A 13    //row select bit 0
+#define B 10    //row select bit 1
+#define C 8    //row select bit 2
+#define D 11    //row select bit 3
+#define E 9    //row select bit 4
+#define CLK 14  //clock (shift register)
+#define LAT 12  //stores shifted data into output register --> latch
+#define OE 15   //active low output enable
 
 #define GPIO_MASK ((1u<<R1) | (1u<<G1) | (1u<<B1) | (1u<<R2) | (1u<<G2) | (1u<<B2) | (1u<<A) | (1u<<B) | (1u<<C) | (1u<<D) | (1u<<E) | (1u<<CLK) | (1u<<LAT) | (1u<<OE))
 

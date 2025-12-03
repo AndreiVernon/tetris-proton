@@ -48,7 +48,7 @@ static inline mp_msg_t mp_decode(uint8_t b) {
 
 //send a raw byte (blocking)
 bool multiplayer_send_byte(uint8_t b) {
-	uart_putc_blocking(UART_INST, b);
+	uart_putc_raw(UART_INST, b);
 	return true;
 }
 
@@ -60,8 +60,8 @@ bool multiplayer_send_msg(mp_msg_t msg) {
 
 //send a message with an extra 1-byte argument
 bool multiplayer_send_msg_with_arg(mp_msg_t msg, uint8_t arg) {
-	uart_putc_blocking(UART_INST, mp_encode(msg));
-	uart_putc_blocking(UART_INST, arg);
+	uart_putc_raw(UART_INST, mp_encode(msg));
+	uart_putc_raw(UART_INST, arg);
 	return true;
 }
 

@@ -12,12 +12,12 @@ void main_menu_loop() {
 
         if (cur_inputs.left) {
             multiplayer = true;
-            return;
+            //return;
         }
 
         if (cur_inputs.right) {
             multiplayer = false;
-            return;
+            //return;
         }
         
         while (!frame_ready) tight_loop_contents();
@@ -34,7 +34,7 @@ int main() {
     multicore_launch_core1(display_loop);
     init_frame_timer();
 
-    main_menu_loop();
+    //main_menu_loop();
 
     if (multiplayer) {
         multiplayer_uart_init();
