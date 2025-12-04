@@ -3,7 +3,6 @@
 #include "hardware/gpio.h"
 #include <string.h>
 #include "display.h"
-#include "assets.h"
 
 // 64x64 RGB LED Matrix - 3mm Pitch - 192mm x 192mm; Product ID: 4732
 // https://www.adafruit.com/product/4732

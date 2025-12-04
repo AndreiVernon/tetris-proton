@@ -8,20 +8,24 @@
 #define FAST_MODE true
 
 #if !FAST_MODE
-//title song + 3 game songs + highscore song (can change to diff ending song if desired)
-#include "songB.h"
-#include "songC.h"
-#include "tetoris.h"
-//#include "highscore44.h" //can choose between ending song, i wanna check quality
-#include "end.h"
-#include "title.h"
+#include "themeB.h"
+#include "themeC.h"
 #endif
 
-#include "songA.h"
 #include "silence.h"
-#include "clear.h"   //clear SFX, clear 4 lines SFX and game over SFX
+#include "title.h"
+#include "themeA.h"
+
+#include "clear.h"
 #include "clear4.h"
-#include "gameoverSFX.h"
+#include "game_over.h"
+#include "game_start.h"
+#include "move.h"
+#include "rotate.h"
+#include "piece_lock.h"
+#include "select_option.h"
+#include "switch_option.h"
+#include "stage_clear.h"
 
 #define AUDIO_PIN 36
 #define SAMPLE_RATE 44100
@@ -55,13 +59,11 @@ typedef struct {
 //0: none, 1: songA, 2: songB, 3: songC, 4: tetoris, 5: end, 6: title
 static const audio_track songs[] = {
     {SILENCE_DATA, SILENCE_DATA_LENGTH},
-    {SONGA_DATA, SONGA_DATA_LENGTH},
+    {THEMEA_DATA, THEMEA_DATA_LENGTH},
+    {TITLE_DATA, TITLE_DATA_LENGTH}
     #if !FAST_MODE
     {SONGB_DATA, SONGB_DATA_LENGTH},
-    {SONGC_DATA, SONGC_DATA_LENGTH},
-    {TETO_DATA, TETO_DATA_LENGTH},
-    {END_DATA, END_DATA_LENGTH},
-    {TITLE_DATA, TITLE_DATA_LENGTH}
+    {SONGC_DATA, SONGC_DATA_LENGTH},    
     #endif
 };
 
@@ -70,7 +72,14 @@ static const audio_track sfx[] = {
     {SILENCE_DATA, SILENCE_DATA_LENGTH},
     {CLEAR_DATA, CLEAR_DATA_LENGTH},
     {CLEAR4_DATA, CLEAR4_DATA_LENGTH},
-    {GAMEOVER_DATA, GAMEOVER_DATA_LENGTH}
+    {GAME_OVER_DATA, GAME_OVER_DATA_LENGTH},
+    {GAME_START_DATA, GAME_START_DATA_LENGTH},
+    {MOVE_DATA, MOVE_DATA_LENGTH},
+    {ROTATE_DATA, ROTATE_DATA_LENGTH},
+    {PIECE_LOCK_DATA, PIECE_LOCK_DATA_LENGTH},
+    {SELECT_OPTION_DATA, SELECT_OPTION_DATA_LENGTH},
+    {SWITCH_OPTION_DATA, SWITCH_OPTION_DATA_LENGTH},
+    {STAGE_CLEAR_DATA, STAGE_CLEAR_DATA_LENGTH},
 };
 
 //mix audio and fill the buffer. we produce packed 32-bit words:

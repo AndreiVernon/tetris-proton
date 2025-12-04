@@ -47,3 +47,13 @@ int main() {
 
     return 0;
 }
+
+void gen_menu_loop() {
+
+    //declare variables: which menu item is selected
+
+    //while game not started
+        //get inputs
+        //based on input change the selected audio
+        //
+}
