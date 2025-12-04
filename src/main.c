@@ -21,9 +21,6 @@ void main_menu_loop() {
             multiplayer = false;
             return;
         }
-        
-        while (!frame_ready) tight_loop_contents();
-        frame_ready = false;
     }
 }
 
@@ -32,20 +29,22 @@ int main() {
     display_init();
     init_inputs();
     init_audio();
+    mp_uart_init();
 
     multicore_launch_core1(display_loop);
     init_frame_timer();
 
     main_menu_loop();
 
-    // if (multiplayer) {
-    //     multiplayer_uart_init();
-
-    //     //connection test failed
-    //     if (!multiplayer_init_connection(5)) multiplayer = false;
-    // }
-
     game_loop();
+
+    //keep rendering last frame forever
+    //replace this with menu system
+    while (1) {
+        render_frame();
+        while (!frame_ready) tight_loop_contents();
+        frame_ready = false;
+    }
 
     return 0;
 }

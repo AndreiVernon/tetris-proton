@@ -7,6 +7,7 @@
 #include "graphics.h"
 #include "input.h"
 #include "sound.h"
+#include "multiplayer.h"
 
 #define GENERATION_DELAY 0.1  //in s
 #define GRAVITY_DELAY 0.5 //secs to fall one row
@@ -163,6 +164,8 @@ void lock_piece() {
         if (oob) game_over = true;
     }
 
+    play_audio(PIECE_LOCK_SFX, true);
+
     hold_avail = true;
     active_piece.shape = INACTIVE;
 }
@@ -242,6 +245,7 @@ void move(bool dir) {
     else active_piece.x--;
 
     if (is_colliding(false)) active_piece.x = x_old;
+    else play_audio(MOVE_SFX, true);
 }
 
 //rotate piece
@@ -316,6 +320,8 @@ void rotate(bool cw) {
 
     //if succeeded, set new rotation state
     active_piece.rotation = rotation_target;
+
+    play_audio(ROTATE_SFX, true);
 }
 
 bool is_touching_surface() {
@@ -616,21 +622,33 @@ void update_game() {
 };
 
 void mp_test() {
+    int i = 0;
+
     while (1) {
         get_inputs();
 
-        //TODO
+        if (cur_inputs.rot_right) {
+            int col;
+
+            if (mp_handshake_blocking(50)) col = S_PIECE;
+            else col = Z_PIECE;
+
+            matrix[i / M_WIDTH][i % M_WIDTH] = col;
+            i++;
+        }
 
         render_frame();
-        sleep_ms(50);
     }
 }
 
 int game_loop() {
     reset_game();
-    play_audio(SONGA_SONG, false);
 
-    //game start stuff
+    render_frame();
+    play_audio(GAME_START_SFX, true);
+    sleep_ms(4000);
+
+    play_audio(THEMEA_SONG, false);
 
     if (multiplayer) mp_test();
 
@@ -645,7 +663,7 @@ int game_loop() {
     }
 
     //game over stuff
-    play_audio(GAMEOVER_SFX, true);
+    play_audio(GAME_OVER_SFX, true);
     play_audio(SILENCE_SONG, false);
 
     while (true) render_frame();
