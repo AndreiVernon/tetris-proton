@@ -19,8 +19,11 @@
 //note:change UART1_IRQ if you use uart0
 #define UART_IRQ UART1_IRQ
 
-static bool awaiting_pong;
-static bool received_pong;
+static bool awaiting_pong = false;
+static bool received_pong = false;
+
+volatile bool received_ping = false;
+volatile bool mp_sync_ready = false;
 
 //encode enum to 4-bit code
 static inline uint8_t mp_encode(mp_msg_t m) {
@@ -57,7 +60,7 @@ bool mp_send_msg(mp_msg_t msg) {
 }
 
 //send packed: upper4=arg lower4=msg
-bool mp_send_msg_packed(uint8_t arg, mp_msg_t msg) {
+bool mp_send_msg_packed(mp_msg_t msg, uint8_t arg) {
 	uint8_t code = mp_encode(msg) & 0x0F;
 	uint8_t b = ((arg & 0x0F) << 4) | code;
 	return mp_send_byte(b);
@@ -83,15 +86,26 @@ static void mp_on_uart_irq(void) {
 
         switch(msg) {
             case mp_msg_ping:
-                mp_send_msg(mp_msg_pong);
+				if (arg == 2) {
+					mp_send_msg_packed(mp_msg_pong, 2);
+					mp_sync_ready = true;
+				}
+				else mp_send_msg(mp_msg_pong);
+
+				received_ping = true;
                 break;
+
             case mp_msg_pong:
 				if (awaiting_pong) received_pong = true;
+				if (arg == 2) mp_sync_ready = true;
                 break;
+
             case mp_msg_send_lines:
                 break;
+
             case mp_msg_game_over:
                 break;
+
             default:               
                 break;
         }

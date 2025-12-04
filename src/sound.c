@@ -8,12 +8,12 @@
 #define FAST_MODE true
 
 #if !FAST_MODE
+#include "title.h"
 #include "themeB.h"
 #include "themeC.h"
 #endif
 
 #include "silence.h"
-#include "title.h"
 #include "themeA.h"
 
 #include "clear.h"
@@ -31,6 +31,9 @@
 #define SAMPLE_RATE 44100
 #define BUFFER_SIZE 256
 #define WRAP 255
+
+#define SONG_VOLUME 70
+#define SFX_VOLUME 100
 
 //buffers that store processed audio
 static uint32_t audiobuffer[2][BUFFER_SIZE];
@@ -56,18 +59,16 @@ typedef struct {
     int length;
 } audio_track;
 
-//0: none, 1: songA, 2: songB, 3: songC, 4: tetoris, 5: end, 6: title
 static const audio_track songs[] = {
     {SILENCE_DATA, SILENCE_DATA_LENGTH},
     {THEMEA_DATA, THEMEA_DATA_LENGTH},
-    {TITLE_DATA, TITLE_DATA_LENGTH}
     #if !FAST_MODE
+    {TITLE_DATA, TITLE_DATA_LENGTH}
     {SONGB_DATA, SONGB_DATA_LENGTH},
     {SONGC_DATA, SONGC_DATA_LENGTH},    
     #endif
 };
 
-//0: none, 1: clear, 2: 4-line clear, 3: gameover
 static const audio_track sfx[] = {
     {SILENCE_DATA, SILENCE_DATA_LENGTH},
     {CLEAR_DATA, CLEAR_DATA_LENGTH},
@@ -90,8 +91,8 @@ static void fill_audio_buffer(int buffer_index) {
         uint8_t song_sample = curr_song[song_pos];
         song_pos = (song_pos + 1) % curr_song_len;
 
-        //get SFX sample if active
-        uint8_t sfx_sample = 0;
+        //get sfx sample if active
+        uint8_t sfx_sample = 128;  //default silence
         if (curr_sfx != SILENCE_DATA && sfx_pos < curr_sfx_len) {
             sfx_sample = curr_sfx[sfx_pos++];
 
@@ -103,10 +104,19 @@ static void fill_audio_buffer(int buffer_index) {
             }
         }
 
-        //mix samples (average to prevent clipping)
-        uint8_t mixed;
-        if (sfx_sample != 0) mixed = (song_sample + sfx_sample) / 2;
-        else mixed = song_sample;
+        //convert to signed -128..127
+        int song_s = (int)song_sample - 128;
+        int sfx_s  = (int)sfx_sample  - 128;
+
+        //apply volumes and mix
+        int mixed_s = (song_s * SONG_VOLUME + sfx_s * SFX_VOLUME) / (100 * 2);
+
+        //clamp
+        if (mixed_s < -128) mixed_s = -128;
+        if (mixed_s > 127)  mixed_s = 127;
+
+        //back to unsigned
+        uint8_t mixed = (uint8_t)(mixed_s + 128);
 
         #if WRAP != 255
         mixed = (uint16_t)mixed * WRAP / 255;

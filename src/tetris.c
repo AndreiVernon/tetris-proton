@@ -88,8 +88,12 @@ static const int8_t rotate_offset_data_i_arika[8][5][2] = {
 
 void gen_rand_bag(bool second_half);
 
-void reset_game()
-{
+void init_game_blank() {
+    memset(matrix, EMPTY, sizeof(matrix));
+    memset(rand_bag, INACTIVE, sizeof(rand_bag));
+}
+
+void reset_game() {
     //clear the playfield
     memset(matrix, EMPTY, sizeof(matrix));
 
@@ -719,15 +723,24 @@ void mp_test() {
     int i = 0;
 
     while (1) {
+        received_ping = false;
         get_inputs();
 
         if (cur_inputs.rot_right) {
             int col;
 
-            if (mp_handshake_blocking(50)) col = S_PIECE;
+            if (mp_handshake_blocking(2)) col = S_PIECE;
             else col = Z_PIECE;
 
             matrix[i / M_WIDTH][i % M_WIDTH] = col;
+            i++;
+        }
+
+        while (!frame_ready) tight_loop_contents();
+        frame_ready = false;
+
+        if (received_ping) {
+            matrix[i / M_WIDTH][i % M_WIDTH] = O_PIECE;
             i++;
         }
 
@@ -749,7 +762,7 @@ int game_loop() {
     while (!game_over) {
         get_inputs();
 
-        if (cur_inputs.pause) pause = !pause;
+        if (cur_inputs.pause && !multiplayer) pause = !pause;
 
         if (!pause) update_game();
 

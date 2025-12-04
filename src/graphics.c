@@ -139,6 +139,9 @@ void init_piece_render(Piece *new_piece, int new_shape) {
     new_piece->rotation = 0;
     new_piece->x = 0;
     new_piece->y = 0;
+    new_piece->size = 0;
+
+    if (new_shape == INACTIVE) return;
     
     if (new_piece->shape == I_PIECE) new_piece->size = 5;
     else if (new_piece->shape == O_PIECE) new_piece->size = 2;
@@ -174,6 +177,8 @@ void render_next() {
     y_offset = 43;
 
     for (int i = 0; i < 7; i++) {
+        if (rand_bag[(rand_bag_loc + i) % 14] == INACTIVE) continue;
+
         Piece cur_piece;
         init_piece_render(&cur_piece, rand_bag[(rand_bag_loc + i) % 14]);
 

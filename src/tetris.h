@@ -48,5 +48,6 @@ extern const int piece_mask_sizes[7];
 extern const uint8_t piece_masks[7][25];   //from bottom left to top right
 
 int game_loop();
+void init_game_blank();
 
 #endif

@@ -14,12 +14,27 @@ void main_menu_loop() {
 
         if (cur_inputs.left) {
             multiplayer = true;
-            return;
+            break;
         }
 
         if (cur_inputs.right) {
             multiplayer = false;
-            return;
+            break;
+        }
+    }
+
+    if (multiplayer) {
+        mp_uart_init();
+
+        //detect other console
+        while (!mp_handshake_blocking(5)) {
+            tight_loop_contents();
+        }
+
+        //sync with other console
+        while (!mp_sync_ready) {
+            mp_send_msg_packed(mp_msg_ping, 2);
+            sleep_us(20);
         }
     }
 }
@@ -29,10 +44,12 @@ int main() {
     display_init();
     init_inputs();
     init_audio();
-    mp_uart_init();
+    //mp_uart_init();
 
     multicore_launch_core1(display_loop);
     init_frame_timer();
+
+    init_game_blank();
 
     main_menu_loop();
 
