@@ -9,9 +9,12 @@
 #include "sound.h"
 #include "multiplayer.h"
 
-#define GENERATION_DELAY 0.1  //in s
-#define GRAVITY_DELAY 0.5 //secs to fall one row
-#define GRAVITY_SOFT_MULT 20 //how much soft drop multiplies gravity by
+#define GENERATION_DELAY 0.2    //in s
+#define GRAVITY_DELAY 0.5       //secs to fall one row
+#define GRAVITY_SOFT_MULT 20    //how much soft drop multiplies gravity by
+
+#define LOCK_DOWN_TIMER 0.5     //in s
+#define LOCK_RESET_LIMIT 15
 
 uint8_t matrix[M_HEIGHT][M_WIDTH] = {0};
 uint32_t score = 0;
@@ -26,6 +29,7 @@ int rand_bag_loc = 0;           //index of bag
 GamePhase cur_phase = GENERATION;
 
 int frame_timer;
+int pause = false;
 
 int generation_timer_flag = -1;     //-1 = not armed, 0 = armed, 1 = fired
 repeating_timer_t generation_timer = {0};
@@ -34,6 +38,11 @@ int gravity_timer_flag = -1;     //-1 = not armed, 0 = normal, 1 = soft drop
 int gravity_count = 0;
 repeating_timer_t gravity_timer = {0};
 bool soft_drop_active = false;
+
+int lock_timer_flag = -1;     //-1 = not armed, 0 = armed, 1 = fired
+repeating_timer_t lock_timer = {0};
+int lock_reset_count = 0;     //number of times lock timer has been reset
+int lowest_height_reached = M_HEIGHT;
 
 const int piece_mask_sizes[7] = {5, 2, 3, 3, 3, 3, 3};
 //from bottom left to top right
@@ -86,6 +95,7 @@ void reset_game()
 
     score = 0;
     game_over = false;
+    pause = false;
 
     //clear active and ghost pieces
     memset(&active_piece, 0, sizeof(active_piece));
@@ -109,6 +119,11 @@ void reset_game()
     gravity_count = 0;
     memset(&gravity_timer, 0, sizeof(gravity_timer));
     soft_drop_active = false;
+
+    lock_timer_flag = -1;
+    memset(&lock_timer, 0, sizeof(lock_timer));
+    int lock_reset_count = 0;
+    int lowest_height_reached = M_HEIGHT;
 }
 
 //check if current piece is colliding with blocks on playfield
@@ -234,23 +249,30 @@ void spawn_piece(int new_shape) {
 
     //game over check
     game_over = is_colliding(false);
+
+    lowest_height_reached = active_piece.y;
 }
 
 //move piece left or right
 //dir: 0 = left, 1 = right
-void move(bool dir) {
+bool move(bool dir) {
     int x_old = active_piece.x;
 
     if (dir) active_piece.x++;
     else active_piece.x--;
 
-    if (is_colliding(false)) active_piece.x = x_old;
-    else play_audio(MOVE_SFX, true);
+    if (is_colliding(false)) {
+        active_piece.x = x_old;
+        return false;
+    }
+
+    play_audio(MOVE_SFX, true);
+    return true;
 }
 
 //rotate piece
 //cw: rotate clockwise
-void rotate(bool cw) {
+bool rotate(bool cw) {
     if (active_piece.shape == O_PIECE) return;
 
     uint8_t mask_old[25];
@@ -315,13 +337,14 @@ void rotate(bool cw) {
         active_piece.x = x_old;
         active_piece.y = y_old;
         memcpy(active_piece.mask, mask_old, sizeof(active_piece.mask));
-        return;
+        return false;
     }
 
     //if succeeded, set new rotation state
     active_piece.rotation = rotation_target;
 
     play_audio(ROTATE_SFX, true);
+    return true;
 }
 
 bool is_touching_surface() {
@@ -431,19 +454,27 @@ void check_lines() {
 }
 
 //drop piece slowly
-//returns true if piece ended up touching surface
+//returns true if piece ended up colliding
 bool drop_piece(int drop_count) {
     int dropped;
+    bool ret = false;
+
     for (dropped = 0; dropped < drop_count; dropped++) {
         active_piece.y--;
 
         if (is_colliding(false)) {
             active_piece.y++;
-            return true;
+            ret = true;
+            break;
         }
     }
+
+    if (active_piece.y < lowest_height_reached) {
+        lock_reset_count = 0;
+        lowest_height_reached = active_piece.y;
+    }
     
-    return false;
+    return ret;
 }
 
 //add garbage in multiplayer moded
@@ -451,11 +482,6 @@ void add_garbage() {
     //gonna have to come up with garbage shapes
     //shift_lines(0, size_of_garbage);
 }
-
-/* //convert xy coordinates to index of playfield matrix
-int coord_to_matrix(int x, int y) {
-    return (M_HEIGHT - y - 1) * M_WIDTH + x;
-} */
 
 //callback function for add_repeating_timer calls
 bool oneshot_cb(repeating_timer_t *rt) {
@@ -501,7 +527,7 @@ bool gravity_cb(repeating_timer_t *rt) {
     return true;
 }
 
-void cancel_gravity() {
+inline void cancel_gravity() {
     cancel_repeating_timer(&gravity_timer);
     gravity_timer_flag = -1;
 }
@@ -566,22 +592,82 @@ void update_falling() {
             cancel_gravity();
             cur_phase = LOCK;
         }
-
-        //no point in checking if touching surface again
-        return;
     }
 
-    //check if piece touching surface
-    active_piece.y += 1;
-    if (is_colliding(false)) {
+    //check if touching surface
+    if (is_touching_surface()) {
         cancel_gravity();
         cur_phase = LOCK;
     }
-    active_piece.y -= 1;
+}
+
+inline void cancel_lock_timer() {
+    cancel_repeating_timer(&lock_timer);
+    lock_timer_flag = -1;
+    lock_reset_count = 0;
+}
+
+inline void reset_lock_timer() {
+    cancel_repeating_timer(&lock_timer);
+    add_repeating_timer_ms(LOCK_DOWN_TIMER * 1000, oneshot_cb, &lock_timer_flag, &lock_timer);
+    lock_timer_flag = 0;
+    lock_reset_count++;
 }
 
 void update_lock() {
-    cur_phase = CLEAR;
+    //arm timer
+    if (lock_timer_flag == -1) {
+        add_repeating_timer_ms(LOCK_DOWN_TIMER * 1000, oneshot_cb, &lock_timer_flag, &lock_timer);
+        lock_timer_flag = 0;
+    }
+
+    //timer has fired
+    if (lock_timer_flag == 1) {
+        cancel_lock_timer();
+        cur_phase = CLEAR;
+        return;
+    }
+
+    //hold piece
+    if (cur_inputs.hold && hold_avail) {
+        cancel_lock_timer();
+        hold_piece();
+        cur_phase = GENERATION;
+        return;
+    }
+
+    //hard drop
+    if (cur_inputs.hard_drop) {
+        cancel_lock_timer();
+        hard_drop(false);
+        cur_phase = CLEAR;
+        return;
+    }
+
+    //movement or rotation
+    if (lock_reset_count < LOCK_RESET_LIMIT && (cur_inputs.left || cur_inputs.right || cur_inputs.rot_left || cur_inputs.rot_right)) {
+        int moved = false;
+
+        if (cur_inputs.left || cur_inputs.right) {
+            moved = moved || move(cur_inputs.right);
+        }
+
+        if (cur_inputs.rot_left || cur_inputs.rot_right) {
+            moved = moved || rotate(cur_inputs.rot_right);
+        }
+
+        //if move successful and space to fall, go to falling phase
+        if (moved && !is_touching_surface()) {
+            cancel_lock_timer();
+            cur_phase = FALLING;
+            return;
+        }
+
+        //if move successful and touching surface, reset lock
+        else if (moved) {
+            reset_lock_timer();
+        }
+    }
 }
 
 void update_clear() {
@@ -646,7 +732,7 @@ int game_loop() {
 
     render_frame();
     play_audio(GAME_START_SFX, true);
-    sleep_ms(4000);
+    sleep_ms(3200);
 
     play_audio(THEMEA_SONG, false);
 
@@ -655,7 +741,9 @@ int game_loop() {
     while (!game_over) {
         get_inputs();
 
-        update_game();
+        if (cur_inputs.pause) pause = !pause;
+
+        if (!pause) update_game();
 
         render_frame();
         while (!frame_ready) tight_loop_contents();

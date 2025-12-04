@@ -1,5 +1,4 @@
 Immediate Debug:
--I piece rotation broken?
 -when hit hold on a piece that is partially fallen, the new piece appears in its position
 --has to do with confusing active_piece.shape with next_shape. make a new variable for this
 
@@ -30,9 +29,12 @@ X--implement in move l/r
 X--determine behaviour that stops/resets movement
 X---only when no longer pressing
 X---continues to next piece after lock down if still pressed
--calculate time before piece locks
---0.5s lock delay when gravity less than 20G?
--pause menu
+X-calculate time before piece locks
+X--0.5s lock delay when gravity less than 20G?
+-increasing gravity
+X-pause menu
+--with an actual pause graphic?
+--iterate over framebuffer, dim everything, add pause text
 -game over
 X--conditions
 --game over screens
@@ -50,9 +52,9 @@ Multiplayer Game Logic:
 --battle / attack / garbage
 --highest score under time limit (time attack)
 -keeping game synced
---send a sync frame over UART when the game starts so both render cycles work at the same time
---pause menu has to be frame-exact sync to avoid problems
----remove pause from multiplayer?
+--no pause in mp
+--in main menu, if you select mp, the text will flash until the other console also chooses mp
+--when both select mp, a ping will be sent which will be used to start the game at the same time
 -garbage progress bar
 -add garbage to game
 --store garbage shapes using some data type
@@ -88,16 +90,16 @@ Display:
 -send display data to screen with DMA
 
 Audio:
--figure out how to get audio data to pwm using DMA
+X-figure out how to get audio data to pwm using DMA
 -physical audio circuit
 --filtering: look at pwm lab
 ---depends on output device?
--figure out format of audio
+X-figure out format of audio
 --4bit 40khz wav?
 --can we efficiently store 2 4bit samples in a byte?
 ---i don't think so. dma only supports transferring one byte minimum at once
 --probably best: just use 8bit samples
--figure out how to play multiple audio tracks at once for music + effects
+X-figure out how to play multiple audio tracks at once for music + effects
 --physically combine outputs of 2 pwm circuits
 --combine them digitally by averaging signals
 ---mix = ((sa - 128) + (sb - 128)) / 2;
