@@ -11,6 +11,7 @@ COLOR_MAP = {
     (0,   0,   0):   "K",           # BLACK
     (255, 255, 255): "W",           # WHITE
     (63,  63,  63):  "DGY",   # DARK GREY
+    # (96, 80, 80):  "GY",    # GREY
     # (249, 255, 178): "WW",   # WARM WHITE
     # (0,   0, 255):   "DB",   # DARK_BLUE
     # (0, 255, 255):   "LB",  # LIGHT_BLUE (cyan)
@@ -19,7 +20,7 @@ COLOR_MAP = {
     # (255, 255, 0):   "Y",      # YELLOW
     # (153, 0, 255):   "P",      # PURPLE
     # (0, 255,   0):   "GR",       # GREEN
-    # (119, 50, 50):   "RU",        # RUST
+    (73, 22, 22):   "DR",        # DARK_RED
 }
 
 # Default token for unmatched pixels

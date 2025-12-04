@@ -69,7 +69,7 @@ void set_block_color(uint8_t *arr, uint8_t px, bool dim) {
             memcpy(arr, ((uint8_t[3])DARK_BLUE), 3);
             break;
         case GARBAGE:
-            memcpy(arr, ((uint8_t[3])RUST), 3);
+            memcpy(arr, ((uint8_t[3])GREY), 3);
             break;
         case GHOST:
             memcpy(arr, ((uint8_t[3])DARK_GREY), 3);

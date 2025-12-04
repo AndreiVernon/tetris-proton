@@ -122,8 +122,8 @@ void reset_game()
 
     lock_timer_flag = -1;
     memset(&lock_timer, 0, sizeof(lock_timer));
-    int lock_reset_count = 0;
-    int lowest_height_reached = M_HEIGHT;
+    lock_reset_count = 0;
+    lowest_height_reached = M_HEIGHT;
 }
 
 //check if current piece is colliding with blocks on playfield
@@ -273,7 +273,7 @@ bool move(bool dir) {
 //rotate piece
 //cw: rotate clockwise
 bool rotate(bool cw) {
-    if (active_piece.shape == O_PIECE) return;
+    if (active_piece.shape == O_PIECE) return false;
 
     uint8_t mask_old[25];
     int size = active_piece.size;
@@ -527,7 +527,7 @@ bool gravity_cb(repeating_timer_t *rt) {
     return true;
 }
 
-inline void cancel_gravity() {
+void cancel_gravity() {
     cancel_repeating_timer(&gravity_timer);
     gravity_timer_flag = -1;
 }
@@ -601,13 +601,12 @@ void update_falling() {
     }
 }
 
-inline void cancel_lock_timer() {
+void cancel_lock_timer() {
     cancel_repeating_timer(&lock_timer);
     lock_timer_flag = -1;
-    lock_reset_count = 0;
 }
 
-inline void reset_lock_timer() {
+void reset_lock_timer() {
     cancel_repeating_timer(&lock_timer);
     add_repeating_timer_ms(LOCK_DOWN_TIMER * 1000, oneshot_cb, &lock_timer_flag, &lock_timer);
     lock_timer_flag = 0;
@@ -624,6 +623,7 @@ void update_lock() {
     //timer has fired
     if (lock_timer_flag == 1) {
         cancel_lock_timer();
+        lock_reset_count = 0;
         cur_phase = CLEAR;
         return;
     }
@@ -631,6 +631,7 @@ void update_lock() {
     //hold piece
     if (cur_inputs.hold && hold_avail) {
         cancel_lock_timer();
+        lock_reset_count = 0;
         hold_piece();
         cur_phase = GENERATION;
         return;
@@ -639,6 +640,7 @@ void update_lock() {
     //hard drop
     if (cur_inputs.hard_drop) {
         cancel_lock_timer();
+        lock_reset_count = 0;
         hard_drop(false);
         cur_phase = CLEAR;
         return;
@@ -646,7 +648,7 @@ void update_lock() {
 
     //movement or rotation
     if (lock_reset_count < LOCK_RESET_LIMIT && (cur_inputs.left || cur_inputs.right || cur_inputs.rot_left || cur_inputs.rot_right)) {
-        int moved = false;
+        bool moved = false;
 
         if (cur_inputs.left || cur_inputs.right) {
             moved = moved || move(cur_inputs.right);
@@ -655,6 +657,12 @@ void update_lock() {
         if (cur_inputs.rot_left || cur_inputs.rot_right) {
             moved = moved || rotate(cur_inputs.rot_right);
         }
+
+        //consume movement input so we arent trapped in inf loop
+        cur_inputs.left = false;
+        cur_inputs.right = false;
+        cur_inputs.rot_left = false;
+        cur_inputs.rot_right = false;
 
         //if move successful and space to fall, go to falling phase
         if (moved && !is_touching_surface()) {

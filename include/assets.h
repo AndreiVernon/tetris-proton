@@ -16,7 +16,9 @@
 #define YELLOW {255, 220, 0}
 #define PURPLE {153, 0, 255}
 #define GREEN {0, 255, 0}
-#define RUST {119, 50, 50}
+#define DARK_RED {73, 22, 22}
+//garbage
+#define GREY {96, 80, 80}
 
 
 #define K BLACK
@@ -30,7 +32,8 @@
 #define Y YELLOW
 #define P PURPLE
 #define GR GREEN
-#define RU RUST
+#define DR DARK_RED
+#define GY GREY
 
 //background mask, from bottom to top
 const uint8_t background[64][64][3] = {
@@ -92,12 +95,12 @@ const uint8_t background[64][64][3] = {
     {K, K, K, K, K, K, K, K, K, K, W, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, W, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K},
     {K, K, K, K, K, K, K, K, K, K, W, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, W, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K},
     {K, K, K, K, K, K, K, K, K, K, W, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, W, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K},
-    {K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, W, K, W, K, W, W, W, K, W, W, W, K, W, W, K, K, K, K, K, K, K, K, K, K},
-    {K, K, K, K, K, K, K, K, K, K, DGY, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, DGY, K, K, K, K, K, K, K, K, W, K, W, K, W, K, W, K, W, K, K, K, W, K, W, K, K, K, K, K, K, K, K, K},
-    {K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, W, W, W, K, W, K, W, K, W, K, K, K, W, K, W, K, K, K, K, K, K, K, K, K},
-    {K, K, K, K, K, K, K, K, K, K, DGY, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, DGY, K, K, K, K, K, K, K, K, W, K, W, K, W, W, W, K, W, K, K, K, W, W, K, K, K, K, K, K, K, K, K, K},
-    {K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K},
-    {K, K, K, K, K, K, K, K, K, K, DGY, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, DGY, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K},
+    {K, K, K, K, K, K, K, K, K, K, DR, DR, DR, DR, DR, DR, DR, DR, DR, DR, DR, DR, DR, DR, DR, DR, DR, DR, DR, DR, DR, DR, K, K, K, K, K, K, K, K, W, K, W, K, W, W, W, K, W, W, W, K, W, W, K, K, K, K, K, K, K, K, K, K},
+    {K, K, K, K, K, K, K, K, K, K, W, DR, DR, DR, DR, DR, DR, DR, DR, DR, DR, DR, DR, DR, DR, DR, DR, DR, DR, DR, DR, W, K, K, K, K, K, K, K, K, W, K, W, K, W, K, W, K, W, K, K, K, W, K, W, K, K, K, K, K, K, K, K, K},
+    {K, K, K, K, K, K, K, K, K, K, DR, DR, DR, DR, DR, DR, DR, DR, DR, DR, DR, DR, DR, DR, DR, DR, DR, DR, DR, DR, DR, DR, K, K, K, K, K, K, K, K, W, W, W, K, W, K, W, K, W, K, K, K, W, K, W, K, K, K, K, K, K, K, K, K},
+    {K, K, K, K, K, K, K, K, K, K, W, DR, DR, DR, DR, DR, DR, DR, DR, DR, DR, DR, DR, DR, DR, DR, DR, DR, DR, DR, DR, W, K, K, K, K, K, K, K, K, W, K, W, K, W, W, W, K, W, K, K, K, W, W, K, K, K, K, K, K, K, K, K, K},
+    {K, K, K, K, K, K, K, K, K, K, DR, DR, DR, DR, DR, DR, DR, DR, DR, DR, DR, DR, DR, DR, DR, DR, DR, DR, DR, DR, DR, DR, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K},
+    {K, K, K, K, K, K, K, K, K, K, W, DR, DR, DR, DR, DR, DR, DR, DR, DR, DR, DR, DR, DR, DR, DR, DR, DR, DR, DR, DR, W, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K},
 };
 
 #endif
