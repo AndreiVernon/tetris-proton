@@ -18,7 +18,86 @@
 #define GREEN {0, 255, 0}
 #define RUST {119, 50, 50}
 
+
+#define K BLACK
+#define W DEFAULT_WHITE
+#define WW WARM_WHITE
+#define DGY DARK_GREY
+#define DB DARK_BLUE
+#define LB LIGHT_BLUE
+#define R RED
+#define O ORANGE
+#define Y YELLOW
+#define P PURPLE
+#define GR GREEN
+#define RU RUST
+
 //background mask, from bottom to top
-extern const uint8_t background[64][64][3];
+const uint8_t background[64][64][3] = {
+    {K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K},
+    {K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K},
+    {K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K},
+    {K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K},
+    {K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K},
+    {K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K},
+    {K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K},
+    {K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K},
+    {K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K},
+    {K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K},
+    {K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K},
+    {K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K},
+    {K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K},
+    {K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K},
+    {K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K},
+    {K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K},
+    {K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K},
+    {K, K, K, K, K, K, K, K, K, K, W, W, W, W, W, W, W, W, W, W, W, W, W, W, W, W, W, W, W, W, W, W, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K},
+    {K, K, K, K, K, K, K, K, K, K, W, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, W, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K},
+    {K, K, K, K, K, K, K, K, K, K, W, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, W, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K},
+    {K, K, K, K, K, K, K, K, K, K, W, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, W, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K},
+    {K, K, K, K, K, K, K, K, K, K, W, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, W, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K},
+    {K, K, K, K, K, K, K, K, K, K, W, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, W, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K},
+    {K, K, K, K, K, K, K, K, K, K, W, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, W, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K},
+    {K, K, K, K, K, K, K, K, K, K, W, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, W, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K},
+    {K, K, K, K, K, K, K, K, K, K, W, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, W, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K},
+    {K, K, K, K, K, K, K, K, K, K, W, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, W, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K},
+    {K, K, K, K, K, K, K, K, K, K, W, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, W, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K},
+    {K, K, K, K, K, K, K, K, K, K, W, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, W, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K},
+    {K, K, K, K, K, K, K, K, K, K, W, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, W, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K},
+    {K, K, K, K, K, K, K, K, K, K, W, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, W, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K},
+    {K, K, K, K, K, K, K, K, K, K, W, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, W, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K},
+    {K, K, K, K, K, K, K, K, K, K, W, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, W, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K},
+    {K, K, K, K, K, K, K, K, K, K, W, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, W, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K},
+    {K, K, K, K, K, K, K, K, K, K, W, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, W, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K},
+    {K, K, K, K, K, K, K, K, K, K, W, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, W, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K},
+    {K, K, K, K, K, K, K, K, K, K, W, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, W, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K},
+    {K, K, K, K, K, K, K, K, K, K, W, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, W, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K},
+    {K, K, K, K, K, K, K, K, K, K, W, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, W, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K},
+    {K, K, K, K, K, K, K, K, K, K, W, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, W, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K},
+    {K, K, K, K, K, K, K, K, K, K, W, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, W, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K},
+    {K, K, K, K, K, K, K, K, K, K, W, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, W, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K},
+    {K, K, K, K, K, K, K, K, K, K, W, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, W, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K},
+    {K, K, K, K, K, K, K, K, K, K, W, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, W, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K},
+    {K, K, K, K, K, K, K, K, K, K, W, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, W, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K},
+    {K, K, K, K, K, K, K, K, K, K, W, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, W, K, K, K, K, K, K, K, W, K, K, W, K, W, W, W, K, W, K, K, W, K, K, W, K, K, K, K, K, K, K, K, K},
+    {K, K, K, K, K, K, K, K, K, K, W, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, W, K, K, K, K, K, K, K, W, K, W, W, K, W, K, K, K, K, K, W, K, K, K, W, K, K, K, K, K, K, K, K, K},
+    {K, K, K, K, K, K, K, K, K, K, W, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, W, K, K, K, K, K, K, K, W, W, K, W, K, W, W, K, K, K, W, K, K, K, K, W, K, K, K, K, K, K, K, K, K},
+    {K, K, K, K, K, K, K, K, K, K, W, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, W, K, K, K, K, K, K, K, W, K, K, W, K, W, W, W, K, W, K, K, W, K, W, W, W, K, K, K, K, K, K, K, K},
+    {K, K, K, K, K, K, K, K, K, K, W, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, W, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K},
+    {K, K, K, K, K, K, K, K, K, K, W, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, W, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K},
+    {K, K, K, K, K, K, K, K, K, K, W, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, W, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K},
+    {K, K, K, K, K, K, K, K, K, K, W, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, W, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K},
+    {K, K, K, K, K, K, K, K, K, K, W, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, W, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K},
+    {K, K, K, K, K, K, K, K, K, K, W, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, W, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K},
+    {K, K, K, K, K, K, K, K, K, K, W, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, W, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K},
+    {K, K, K, K, K, K, K, K, K, K, W, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, W, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K},
+    {K, K, K, K, K, K, K, K, K, K, W, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, W, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K},
+    {K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, W, K, W, K, W, W, W, K, W, W, W, K, W, W, K, K, K, K, K, K, K, K, K, K},
+    {K, K, K, K, K, K, K, K, K, K, DGY, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, DGY, K, K, K, K, K, K, K, K, W, K, W, K, W, K, W, K, W, K, K, K, W, K, W, K, K, K, K, K, K, K, K, K},
+    {K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, W, W, W, K, W, K, W, K, W, K, K, K, W, K, W, K, K, K, K, K, K, K, K, K},
+    {K, K, K, K, K, K, K, K, K, K, DGY, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, DGY, K, K, K, K, K, K, K, K, W, K, W, K, W, W, W, K, W, K, K, K, W, W, K, K, K, K, K, K, K, K, K, K},
+    {K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K},
+    {K, K, K, K, K, K, K, K, K, K, DGY, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, DGY, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K},
+};
 
 #endif
