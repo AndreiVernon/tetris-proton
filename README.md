@@ -1,6 +1,6 @@
 # Tetris - Purdue Proton
 
-This project implements a multiplayer Tetris variant on the RP2350B-based Purdue Proton development board.
+This project implements a multiplayer Tetris variant on the Purdue Proton development board, which uses the same 2350b microcontroller as the Raspberry Pi Pico 2.
 
 ## Overview
 
