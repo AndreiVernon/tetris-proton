@@ -16,7 +16,7 @@
 #define YELLOW {255, 220, 0}
 #define PURPLE {153, 0, 255}
 #define GREEN {0, 255, 0}
-#define DARK_RED {85, 22, 22}
+#define DARK_RED {100, 22, 22}
 //garbage
 #define GREY {50, 35, 35}
 

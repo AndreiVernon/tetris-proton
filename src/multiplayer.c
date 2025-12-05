@@ -20,15 +20,11 @@
 //note:change UART1_IRQ if you use uart0
 #define UART_IRQ UART1_IRQ
 
-bool multiplayer = false;
-
 static bool awaiting_pong = false;
 static bool received_pong = false;
 
 volatile bool received_ping = false;
 volatile bool mp_sync_ready = false;
-
-volatile int garbage_queue = 0;   //pos is sending, neg is receiving
 
 //encode enum to 4-bit code
 static inline uint8_t mp_encode(mp_msg_t m) {

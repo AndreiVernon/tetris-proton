@@ -43,6 +43,10 @@ repeating_timer_t lock_timer = {0};
 int lock_reset_count = 0;     //number of times lock timer has been reset
 int lowest_height_reached = M_HEIGHT;
 
+bool mp_test_en = false;
+bool multiplayer = false;
+volatile int garbage_queue = 0;   //pos is sending, neg is receiving
+
 const int piece_mask_sizes[7] = {5, 2, 3, 3, 3, 3, 3};
 //from bottom left to top right
 const uint8_t piece_masks[7][25] = {
@@ -592,6 +596,7 @@ void update_falling() {
     if (cur_inputs.hold && hold_avail) {
         cancel_gravity();
         hold_piece();
+        cur_inputs.hold = false; //consume
         cur_phase = GENERATION;
         return;
     }
@@ -600,6 +605,7 @@ void update_falling() {
     if (cur_inputs.hard_drop) {
         cancel_gravity();
         hard_drop(false);
+        cur_inputs.hard_drop = false; //consume
         cur_phase = CLEAR;
         return;
     }
@@ -614,12 +620,20 @@ void update_falling() {
     //movement
     if (cur_inputs.left || cur_inputs.right) {
         move(cur_inputs.right);
+
+        //consume
+        cur_inputs.left = false;
+        cur_inputs.right = false;
     }
 
     //rotation
     if (cur_inputs.rot_left || cur_inputs.rot_right) {
         //cw = true for rightwards rot
         rotate(cur_inputs.rot_right);
+
+        //consume
+        cur_inputs.rot_left = false;
+        cur_inputs.rot_right = false;
     }
 
     //perform inputs before applying gravity so game feels more responsive
@@ -675,6 +689,7 @@ void update_lock() {
         cancel_lock_timer();
         lock_reset_count = 0;
         hold_piece();
+        cur_inputs.hold = false; //consume
         cur_phase = GENERATION;
         return;
     }
@@ -684,6 +699,7 @@ void update_lock() {
         cancel_lock_timer();
         lock_reset_count = 0;
         hard_drop(false);
+        cur_inputs.hard_drop = false; //consume
         cur_phase = CLEAR;
         return;
     }
@@ -818,7 +834,7 @@ int game_loop() {
 
     play_audio(THEMEA_SONG, false);
 
-    //if (multiplayer) mp_test();
+    if (multiplayer && mp_test_en) mp_test();
 
     while (game_over == 0) {
         get_inputs();

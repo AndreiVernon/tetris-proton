@@ -15,6 +15,8 @@
 #define GARBAGE 7
 #define EMPTY 67
 #define GHOST 61
+#define WALL 62
+#define OOB 63
 #define INACTIVE -1
 
 typedef struct {
@@ -45,6 +47,10 @@ extern GamePhase cur_phase;
 
 extern const int piece_mask_sizes[7];
 extern const uint8_t piece_masks[7][25];   //from bottom left to top right
+
+extern bool multiplayer;
+extern bool mp_test_en;
+extern volatile int garbage_queue;   //pos is sending, neg is receiving
 
 int game_loop();
 void init_game_blank();

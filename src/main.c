@@ -17,6 +17,12 @@ void main_menu_loop() {
             break;
         }
 
+        if (cur_inputs.pause) {
+            multiplayer = true;
+            mp_test_en = true;
+            break;
+        }
+
         if (cur_inputs.right) {
             multiplayer = false;
             break;

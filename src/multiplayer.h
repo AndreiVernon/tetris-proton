@@ -11,10 +11,8 @@ typedef enum {
 	mp_msg_game_over   = 0x04,
 } mp_msg_t;
 
-extern bool multiplayer;
 extern volatile bool received_ping;
 extern volatile bool mp_sync_ready;
-extern volatile int garbage_queue;   //pos is sending, neg is receiving
 
 void mp_uart_init();
 bool mp_send_msg(mp_msg_t msg);

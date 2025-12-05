@@ -45,8 +45,8 @@ void render_background() {
     memcpy(framebuffer[!fbf_rdy], background, sizeof(framebuffer[!fbf_rdy]));
 }
 
-void set_block_color(uint8_t *arr, uint8_t px, bool dim) {
-    switch (px) {
+void set_pixel_color(uint8_t *arr, uint8_t shape_id, bool dim) {
+    switch (shape_id) {
         case I_PIECE:
             memcpy(arr, ((uint8_t[3])LIGHT_BLUE), 3);
             break;
@@ -74,6 +74,12 @@ void set_block_color(uint8_t *arr, uint8_t px, bool dim) {
         case GHOST:
             memcpy(arr, ((uint8_t[3])DARK_GREY), 3);
             break;
+        case WALL:
+            memcpy(arr, ((uint8_t[3])FULL_WHITE), 3);
+            break;
+        case OOB:
+            memcpy(arr, ((uint8_t[3])DARK_RED), 3);
+            break;
         default:
             memcpy(arr, ((uint8_t[3])BLACK), 3);
     }
@@ -83,6 +89,14 @@ void set_block_color(uint8_t *arr, uint8_t px, bool dim) {
         arr[1] *= V;
         arr[2] *= V;
     }
+}
+
+//coords are for bottom left corner of block
+void set_block_color(int frame_y, int frame_x, uint8_t shape_id, bool dim) {
+    set_pixel_color(framebuffer[!fbf_rdy][frame_y][frame_x], shape_id, dim);
+    set_pixel_color(framebuffer[!fbf_rdy][frame_y][frame_x + 1], shape_id, dim);
+    set_pixel_color(framebuffer[!fbf_rdy][frame_y + 1][frame_x], shape_id, dim);
+    set_pixel_color(framebuffer[!fbf_rdy][frame_y + 1][frame_x + 1], shape_id, dim);
 }
 
 void render_matrix() {
@@ -96,11 +110,7 @@ void render_matrix() {
             if (frame_y >= PANEL_HEIGHT || frame_x >= PANEL_WIDTH) continue;
             // || frame_y < 0 || frame_x < 0
 
-            //draw 4 pixels per block
-            set_block_color(framebuffer[!fbf_rdy][frame_y][frame_x], matrix[y][x], true);
-            set_block_color(framebuffer[!fbf_rdy][frame_y][frame_x + 1], matrix[y][x], true);
-            set_block_color(framebuffer[!fbf_rdy][frame_y + 1][frame_x], matrix[y][x], true);
-            set_block_color(framebuffer[!fbf_rdy][frame_y + 1][frame_x + 1], matrix[y][x], true);
+            set_block_color(frame_y, frame_x, matrix[y][x], true);
         }
     }
 }
@@ -111,9 +121,6 @@ void render_piece(Piece cur_piece, int x_offset, int y_offset) {
     //-1 means piece is hidden
     if (cur_piece.shape == INACTIVE) return;
 
-    uint8_t col[3];
-    set_block_color(col, cur_piece.shape, false);
-
     for (int y = 0; y < cur_piece.size; y++) {
         for (int x = 0; x < cur_piece.size; x++) {
             if (!cur_piece.mask[y * cur_piece.size + x]) continue;
@@ -123,11 +130,7 @@ void render_piece(Piece cur_piece, int x_offset, int y_offset) {
 
             if (frame_y >= PANEL_HEIGHT || frame_x >= PANEL_WIDTH || frame_y < 0 || frame_x < 0) continue;
 
-            //draw 4 pixels per block
-            memcpy(framebuffer[!fbf_rdy][frame_y][frame_x], col, 3);
-            memcpy(framebuffer[!fbf_rdy][frame_y][frame_x + 1], col, 3);
-            memcpy(framebuffer[!fbf_rdy][frame_y + 1][frame_x], col, 3);
-            memcpy(framebuffer[!fbf_rdy][frame_y + 1][frame_x + 1], col, 3);
+            set_block_color(frame_y, frame_x, cur_piece.shape, false);
         }
     }
 }
@@ -202,18 +205,39 @@ void render_next() {
 }
 
 void render_garbage_queue() {
+    //render extra wall
+    int y_offset = 17;
+    int x_offset = 7;
+    for (int y = y_offset; y < M_HEIGHT; y++) {
+        for (int x = x_offset; x < x_offset + 3; x++) {
+            if (y == y_offset || x == x_offset)
+                set_pixel_color(framebuffer[!fbf_rdy][y][x], WALL, false);
+        }
+    }
 
+    //render dark red pieces
+    int garbage_drawn = 0;
+    int garbage_target = -garbage_queue;
+    for (int y = y_offset + 1; y < M_WIDTH && garbage_drawn < garbage_target; y += 2) {
+        set_block_color(y, x_offset + 1, OOB, false);
+    }
 }
 
 void render_frame() {
     render_background();
+
     render_matrix();
+
     render_piece(ghost_piece, MATRIX_OFFSET_X, MATRIX_OFFSET_Y);
     render_piece(active_piece, MATRIX_OFFSET_X, MATRIX_OFFSET_Y);
+
     // render_clear_line();
+
     render_hold();
     render_next();
-    //render_garbage_queue();
+
+    if (multiplayer) render_garbage_queue();
+
     // render_score();
     // render_time();
 
