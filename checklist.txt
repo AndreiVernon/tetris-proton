@@ -35,9 +35,9 @@ X--0.5s lock delay when gravity less than 20G?
 X-pause menu
 --with an actual pause graphic?
 --iterate over framebuffer, dim everything, add pause text
--game over
+X-game over
 X--conditions
---game over screens
+X--game over screens
 -scoring
 --combo recognition
 --perfect clear recognition
@@ -47,18 +47,17 @@ X--conditions
 -high score?
 
 Multiplayer Game Logic:
--win logic
+X-win logic
 -different gamemodes
 --battle / attack / garbage
 --highest score under time limit (time attack)
--keeping game synced
---no pause in mp
+X-keeping game synced
+X--no pause in mp
 --in main menu, if you select mp, the text will flash until the other console also chooses mp
---when both select mp, a ping will be sent which will be used to start the game at the same time
+X--when both select mp, a ping will be sent which will be used to start the game at the same time
 -garbage progress bar
--add garbage to game
---store garbage shapes using some data type
---use shift_lines to move existing lines up before adding garbage at bottom
+X-add garbage to game
+X--use shift_lines to move existing lines up before adding garbage at bottom
 -additional scoring
 
 Misc Logic:

@@ -201,6 +201,10 @@ void render_next() {
     }
 }
 
+void render_garbage_queue() {
+
+}
+
 void render_frame() {
     render_background();
     render_matrix();
@@ -209,6 +213,7 @@ void render_frame() {
     // render_clear_line();
     render_hold();
     render_next();
+    //render_garbage_queue();
     // render_score();
     // render_time();
 

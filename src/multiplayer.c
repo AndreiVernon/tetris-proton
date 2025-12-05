@@ -6,6 +6,7 @@
 #include "hardware/gpio.h"
 #include "hardware/irq.h"
 #include "multiplayer.h"
+#include "tetris.h"
 
 #define UART_INST uart1
 #define UART_TX_PIN 40
@@ -19,11 +20,15 @@
 //note:change UART1_IRQ if you use uart0
 #define UART_IRQ UART1_IRQ
 
+bool multiplayer = false;
+
 static bool awaiting_pong = false;
 static bool received_pong = false;
 
 volatile bool received_ping = false;
 volatile bool mp_sync_ready = false;
+
+volatile int garbage_queue = 0;   //pos is sending, neg is receiving
 
 //encode enum to 4-bit code
 static inline uint8_t mp_encode(mp_msg_t m) {
@@ -76,6 +81,8 @@ static inline void mp_drain_rx(void) {
 //internal IRQ handler
 //reads all bytes available and updates globals
 static void mp_on_uart_irq(void) {
+	if (!multiplayer) return;
+
 	//read all pending bytes
 	while (uart_is_readable(UART_INST)) {
 		uint8_t msg_byte = uart_getc(UART_INST);
@@ -101,9 +108,11 @@ static void mp_on_uart_irq(void) {
                 break;
 
             case mp_msg_send_lines:
+				garbage_queue += arg;
                 break;
 
             case mp_msg_game_over:
+				game_over = -1;
                 break;
 
             default:               
@@ -131,15 +140,15 @@ void mp_uart_init() {
 }
 
 //try handshake by sending ping and waiting for pong
-bool mp_handshake_blocking(uint32_t timeout_ms) {
+bool mp_handshake_blocking(uint64_t timeout_us) {
 	mp_send_msg(mp_msg_ping);
 
 	awaiting_pong = true;
 	received_pong = false;
 
-	uint32_t wait_until_ms = to_ms_since_boot(get_absolute_time()) + timeout_ms;
+	uint64_t wait_until_us = to_us_since_boot(get_absolute_time()) + timeout_us;
 
-	while (to_ms_since_boot(get_absolute_time()) < wait_until_ms && !received_pong) {
+	while (to_us_since_boot(get_absolute_time()) < wait_until_us && !received_pong) {
 		tight_loop_contents();
 	}
 

@@ -3,7 +3,7 @@
 
 #include "pico/stdlib.h"
 
-#define TARGET_FRAMERATE 60
+#define TARGET_FRAMERATE 90
 
 extern volatile bool frame_ready;   //frame ready to display
 

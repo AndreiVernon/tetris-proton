@@ -27,7 +27,7 @@ void main_menu_loop() {
         mp_uart_init();
 
         //detect other console
-        while (!mp_handshake_blocking(5)) {
+        while (!mp_handshake_blocking(1000)) {
             tight_loop_contents();
         }
 

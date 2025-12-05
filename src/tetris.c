@@ -9,7 +9,7 @@
 #include "sound.h"
 #include "multiplayer.h"
 
-#define GENERATION_DELAY 0.2    //in s
+#define GENERATION_DELAY 0.1    //in s
 #define GRAVITY_DELAY 0.5       //secs to fall one row
 #define GRAVITY_SOFT_MULT 20    //how much soft drop multiplies gravity by
 
@@ -18,8 +18,7 @@
 
 uint8_t matrix[M_HEIGHT][M_WIDTH] = {0};
 uint32_t score = 0;
-volatile bool game_over = false;
-bool multiplayer = false;
+volatile int game_over = 0;
 Piece active_piece = {0};       //currently active piece
 Piece ghost_piece = {0};        //ghost piece / shadow of active piece
 int held_piece_shape = INACTIVE;      //shape of held piece
@@ -98,7 +97,7 @@ void reset_game() {
     memset(matrix, EMPTY, sizeof(matrix));
 
     score = 0;
-    game_over = false;
+    game_over = 0;
     pause = false;
 
     //clear active and ghost pieces
@@ -180,13 +179,27 @@ void lock_piece() {
         }
         nested_break:
 
-        if (oob) game_over = true;
+        if (oob) game_over += 1;
     }
 
     play_audio(PIECE_LOCK_SFX, true);
 
     hold_avail = true;
     active_piece.shape = INACTIVE;
+}
+
+//generates number between 0..max-1
+uint32_t get_rand_32_uniform_scaled(uint32_t max) {
+    uint32_t j;
+    int limit = UINT32_MAX - (UINT32_MAX % max);
+
+    do {
+        j = get_rand_32();
+    } while (j >= limit);
+
+    j %= max;
+
+    return j;
 }
 
 //generates random bag of tetriminos
@@ -199,14 +212,7 @@ void gen_rand_bag(bool second_half) {
 
     //Fisher-Yates shuffle (uniform sampling)
     for (int i = 6; i > 0; i--) {
-        uint32_t j;
-        int limit = UINT32_MAX - (UINT32_MAX % (i + 1));
-
-        do {
-            j = get_rand_32();
-        } while (j >= limit);
-
-        j %= (i + 1);
+        int j = get_rand_32_uniform_scaled(i + 1);
 
         int temp = arr[i];
         arr[i] = arr[j];
@@ -252,7 +258,7 @@ void spawn_piece(int new_shape) {
     }
 
     //game over check
-    game_over = is_colliding(false);
+    game_over += is_colliding(false);
 
     lowest_height_reached = active_piece.y;
 }
@@ -420,8 +426,8 @@ void shift_lines(int row, int amount) {
     if (amount > 0) {
         for (int y = 20; y < M_HEIGHT; y++) {
             for (int x = 0; x < M_WIDTH; x++) {
-                if (x != EMPTY) {
-                    game_over = true;
+                if (matrix[y][x] != EMPTY) {
+                    game_over += 1;
                     goto nested_break;
                 }
             }
@@ -433,7 +439,7 @@ void shift_lines(int row, int amount) {
 }
 
 //checks for completed lines and removes them
-void check_lines() {
+int check_lines() {
     int cleared = 0;
     for (int y = 0; y < M_HEIGHT; y++) {
         int cleared_cnt = 0;
@@ -455,6 +461,8 @@ void check_lines() {
 
     if (cleared >= 4) play_audio(CLEAR4_SFX, true);
     else if (cleared > 0) play_audio(CLEAR_SFX, true);
+
+    return cleared;
 }
 
 //drop piece slowly
@@ -481,10 +489,40 @@ bool drop_piece(int drop_count) {
     return ret;
 }
 
-//add garbage in multiplayer moded
+//add garbage to matrix
 void add_garbage() {
-    //gonna have to come up with garbage shapes
-    //shift_lines(0, size_of_garbage);
+    if (!multiplayer) return;
+
+    //randomly select gap block
+    int gap_x = get_rand_32_uniform_scaled(M_WIDTH);
+
+    while (garbage_queue > 0) {
+        shift_lines(0, 1);
+
+        //create garbage blocks
+        for (int x = 0; x < M_WIDTH; x++) {
+            if (x != gap_x) matrix[0][x] = GARBAGE;
+        }
+
+        //if garbage covers active piece, push it out of the floor
+        if (is_colliding(false)) active_piece.y++;
+
+        garbage_queue--;
+    }
+
+    //TODO sound effect
+}
+
+void send_garbage(int amount) {
+    if (!multiplayer) return;
+
+    garbage_queue += amount;
+
+    //if already receiving more than we are sending out
+    if (garbage_queue <= 0) return;
+
+    mp_send_msg_packed(mp_msg_send_lines, garbage_queue);
+    garbage_queue = 0;
 }
 
 //callback function for add_repeating_timer calls
@@ -685,7 +723,30 @@ void update_lock() {
 void update_clear() {
     lock_piece();
 
-    check_lines();
+    int cleared = check_lines();
+
+    if (multiplayer) {
+        switch (cleared) {
+            case 0:
+                add_garbage();
+                break;
+            case 1:
+                send_garbage(1);
+                break;
+            case 2:
+                send_garbage(2);
+                break;
+            case 3:
+                send_garbage(3);
+                break;
+            case 4:
+                send_garbage(4);
+                break;
+            default:
+                send_garbage(4);
+                break;
+        }
+    }
 
     cur_phase = GENERATION;
 }
@@ -729,7 +790,7 @@ void mp_test() {
         if (cur_inputs.rot_right) {
             int col;
 
-            if (mp_handshake_blocking(2)) col = S_PIECE;
+            if (mp_handshake_blocking(250)) col = S_PIECE;
             else col = Z_PIECE;
 
             matrix[i / M_WIDTH][i % M_WIDTH] = col;
@@ -757,9 +818,9 @@ int game_loop() {
 
     play_audio(THEMEA_SONG, false);
 
-    if (multiplayer) mp_test();
+    //if (multiplayer) mp_test();
 
-    while (!game_over) {
+    while (game_over == 0) {
         get_inputs();
 
         if (cur_inputs.pause && !multiplayer) pause = !pause;
@@ -771,8 +832,19 @@ int game_loop() {
         frame_ready = false;
     }
 
-    //game over stuff
-    play_audio(GAME_OVER_SFX, true);
+    if (game_over == 1) {
+        mp_send_msg(mp_msg_game_over);
+        play_audio(GAME_OVER_SFX, true);
+        memset(matrix, Z_PIECE, sizeof(matrix));
+    }
+
+    if (game_over == -1) {
+        memset(matrix, S_PIECE, sizeof(matrix));
+    }
+
+    active_piece.shape = INACTIVE;
+    ghost_piece.shape = INACTIVE;
+
     play_audio(SILENCE_SONG, false);
 
     while (true) render_frame();

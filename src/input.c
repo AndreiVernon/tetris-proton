@@ -2,7 +2,7 @@
 #include <string.h>
 #include "input.h"
 
-#define DAS_FRAMES 18
+#define DAS_FRAMES 10
 
 #define CLK_PIN 18
 #define LAT_PIN 19
@@ -11,16 +11,28 @@
 RawInputState raw_inputs = {0};
 InputState cur_inputs = {0};
 
-static uint32_t left_buf, right_buf;
+static uint64_t left_press_time, left_last_rep;
+static uint64_t right_press_time, right_last_rep;
 static bool last_move_dir; //0 = left, 1 = right
 static uint8_t down_buf, a_buf, b_buf, start_buf, select_buf;
+
+//das timings in microseconds
+//10 frames ~= 167ms
+//2 frames  ~= 33ms
+//subtract 2ms to account for frame times
+#define DAS_US 164000ULL
+#define ARR_US 31000ULL
 
 //init gpio and such
 //set all buffer variables to 0
 void init_inputs() {
     memset(&raw_inputs, 0, sizeof(raw_inputs));
     memset(&cur_inputs, 0, sizeof(cur_inputs));
-    left_buf = right_buf = last_move_dir = down_buf = a_buf = b_buf = start_buf = select_buf = 0;
+
+    left_press_time = right_press_time = 0ULL;
+    left_last_rep   = right_last_rep   = 0ULL;
+    last_move_dir = false;
+    down_buf = a_buf = b_buf = start_buf = select_buf = 0;
 
     // controller gpio
     gpio_init_mask(0b111 << 18);
@@ -71,43 +83,38 @@ static inline bool edge_activated_u8(uint8_t buf) {
     //11 - being held, do nothing
     //10 - just let go, do nothing 
 
-    return (buf & 0b111u) == 0b001u;
+    return (buf & 0b11u) == 0b01u;
 }
 
 //dir: 0 = left, 1 = right
-static bool das_should_move(uint32_t* buf_p, bool alt, bool dir) {
-    //buf LSB-first: consecutive trailing 1s = how many frames the button's been held (1..)
-
-    //frame 1 : activate input
-    //frames 2 to DAS_FRAMES : do nothing
-    //frames >DAS_FRAMES : activate input every other frame
-
-    uint32_t buf = *buf_p;
-
-    //get the number of trailing 1s
-    int hold_len = 0;
-    uint32_t temp = buf;
-    while (temp & 1u) {
-        hold_len++; 
-        temp >>= 1;
+static bool das_should_move(bool curr_pressed, uint64_t *press_time_p, uint64_t *last_rep_p, bool dir) {
+    //if not held, reset timers and do nothing
+    if (!curr_pressed) {
+        *press_time_p = 0ULL;
+        *last_rep_p = 0ULL;
+        return false;
     }
 
-    //not currently held, do nothing
-    if (hold_len == 0) return false;
+    uint64_t now = to_us_since_boot(get_absolute_time());
 
-    //just pressed, activate input
-    if (hold_len == 1) {
-        //reset alt flag so that it's ready for next repeat
-        *buf_p |= (1 << DAS_FRAMES);
-
+    //just pressed: press_time was zero
+    if (*press_time_p == 0ULL) {
+        *press_time_p = now;
+        *last_rep_p = now;
         last_move_dir = dir;
         return true;
     }
 
-    if (hold_len >= DAS_FRAMES) {
-        //invert alt flag
-        *buf_p |= ((alt ? 0 : 1) << DAS_FRAMES);
-        return alt;
+    //held but still in initial DAS delay
+    if (now - *press_time_p < DAS_US) {
+        return false;
+    }
+
+    //past DAS delay: allow repeats at ARR_US interval
+    if (now - *last_rep_p >= ARR_US) {
+        *last_rep_p = now;
+        last_move_dir = dir;
+        return true;
     }
 
     return false;
@@ -124,11 +131,11 @@ void get_inputs(void) {
     cur_inputs.soft_drop = raw_inputs.up;
 
     //hold and release
-    down_buf     = ((down_buf     << 1) | raw_inputs.down)     & 0b111;
-    a_buf      = ((a_buf      << 1) | raw_inputs.a)      & 0b111;
-    b_buf      = ((b_buf      << 1) | raw_inputs.b)      & 0b111;
-    start_buf  = ((start_buf  << 1) | raw_inputs.start)  & 0b111;
-    select_buf = ((select_buf << 1) | raw_inputs.select) & 0b111;
+    down_buf   = ((down_buf   << 1) | raw_inputs.down)   & 0b11;
+    a_buf      = ((a_buf      << 1) | raw_inputs.a)      & 0b11;
+    b_buf      = ((b_buf      << 1) | raw_inputs.b)      & 0b11;
+    start_buf  = ((start_buf  << 1) | raw_inputs.start)  & 0b11;
+    select_buf = ((select_buf << 1) | raw_inputs.select) & 0b11;
 
     cur_inputs.rot_left  = edge_activated_u8(b_buf);
     cur_inputs.rot_right = edge_activated_u8(a_buf);
@@ -139,14 +146,9 @@ void get_inputs(void) {
     //if both rot_left and rot_right are active, default to left
     if (cur_inputs.rot_left && cur_inputs.rot_right) cur_inputs.rot_right = false;
 
-    //DAS
-    bool alt = (left_buf >> DAS_FRAMES) & 1u; //track every-other-frame movement
-    left_buf  = ((left_buf  << 1) | (raw_inputs.left)) & ((1u << DAS_FRAMES) - 1u);
-    cur_inputs.left = das_should_move(&left_buf, alt, false);
-
-    alt = (right_buf >> DAS_FRAMES) & 1u;
-    right_buf = ((right_buf << 1) | (raw_inputs.right)) & ((1u << DAS_FRAMES) - 1u);
-    cur_inputs.right = das_should_move(&right_buf, alt, true);
+    //DAS (timer-based)
+    cur_inputs.left  = das_should_move(raw_inputs.left,  &left_press_time,  &left_last_rep,  false);
+    cur_inputs.right = das_should_move(raw_inputs.right, &right_press_time, &right_last_rep, true);
 
     //if both directions are pressed, only enable most recent
     if (cur_inputs.left && cur_inputs.right) {
