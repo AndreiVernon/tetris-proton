@@ -10,25 +10,35 @@
 #include "multiplayer.h"
 
 #define GENERATION_DELAY 0.1    //in s
-#define GRAVITY_DELAY 0.5       //secs to fall one row
+#define MP_LEVEL_TIMER 20        //how long it takes to increase level by 1 in multiplayer
+#define GRAVITY_INCREASE 0.007
 #define GRAVITY_SOFT_MULT 20    //how much soft drop multiplies gravity by
 
 #define LOCK_DOWN_TIMER 0.5     //in s
 #define LOCK_RESET_LIMIT 15
 
 uint8_t matrix[M_HEIGHT][M_WIDTH] = {0};
+
 uint32_t score = 0;
+uint32_t level = 1;
+double gravity = 1; //secs to fall one row
 volatile int game_over = 0;
+
 Piece active_piece = {0};       //currently active piece
 Piece ghost_piece = {0};        //ghost piece / shadow of active piece
+
 int held_piece_shape = INACTIVE;      //shape of held piece
 bool hold_avail = true;         //can hold piece
+
 int rand_bag[14] = {0};         //bag of upcoming pieces
 int rand_bag_loc = 0;           //index of bag
+
 GamePhase cur_phase = GENERATION;
 
 int frame_timer;
 int pause = false;
+
+uint32_t game_start_time;   //in ms
 
 int generation_timer_flag = -1;     //-1 = not armed, 0 = armed, 1 = fired
 repeating_timer_t generation_timer = {0};
@@ -96,13 +106,26 @@ void init_game_blank() {
     memset(rand_bag, INACTIVE, sizeof(rand_bag));
 }
 
+inline void update_gravity() {
+    //(0.8 - ((level - 1) * 0.007))^(level - 1)
+    gravity = pow((0.8 - ((level - 1) * GRAVITY_INCREASE)), (level - 1));
+}
+
+//returns time in s
+uint32_t get_game_time() {
+    return to_ms_since_boot(get_absolute_time()) - game_start_time;
+}
+
 void reset_game() {
     //clear the playfield
     memset(matrix, EMPTY, sizeof(matrix));
 
     score = 0;
+    level = 1;
     game_over = 0;
     pause = false;
+    
+    update_gravity();
 
     //clear active and ghost pieces
     memset(&active_piece, 0, sizeof(active_piece));
@@ -555,6 +578,9 @@ void update_generation() {
     //timer has fired, now disarm
     if (generation_timer_flag == 1) {
         generation_timer_flag = -1;
+
+        update_gravity();
+
         spawn_piece(active_piece.shape);
 
         //guide says "immediately drops one row" if it has space
@@ -589,7 +615,7 @@ void update_falling() {
     if (gravity_timer_flag == -1) {
         //arm timer
         gravity_timer_flag = 0;
-        add_repeating_timer_ms(GRAVITY_DELAY * 1000, gravity_cb, &gravity_count, &gravity_timer);
+        add_repeating_timer_ms(gravity * 1000, gravity_cb, &gravity_count, &gravity_timer);
     }
 
     //hold piece
@@ -613,7 +639,7 @@ void update_falling() {
     //soft drop
     if (cur_inputs.soft_drop && gravity_timer_flag != 1) {
         cancel_gravity();
-        add_repeating_timer_ms(GRAVITY_DELAY * 1000 / GRAVITY_SOFT_MULT, gravity_cb, &gravity_count, &gravity_timer);
+        add_repeating_timer_ms(gravity * 1000 / GRAVITY_SOFT_MULT, gravity_cb, &gravity_count, &gravity_timer);
         gravity_timer_flag = 1;
     }
 
@@ -736,33 +762,46 @@ void update_lock() {
     }
 }
 
+bool perfect_clear_check() {
+    for (int y = 0; y < 4; y++) {
+        for (int x = 0; x < M_WIDTH; x++) {
+            if (matrix[y][x] != EMPTY) return false;
+        }
+    }
+    return true;
+}
+
 void update_clear() {
     lock_piece();
 
     int cleared = check_lines();
 
-    if (multiplayer) {
-        switch (cleared) {
-            case 0:
-                add_garbage();
-                break;
-            case 1:
-                send_garbage(1);
-                break;
-            case 2:
-                send_garbage(2);
-                break;
-            case 3:
-                send_garbage(3);
-                break;
-            case 4:
-                send_garbage(4);
-                break;
-            default:
-                send_garbage(4);
-                break;
-        }
+    //perfect clear
+    if (perfect_clear_check()) {
+        if (multiplayer) add_garbage(10);
+        //TODO also add garbage of last line
     }
+    switch (cleared) {
+        case 0:
+            if (multiplayer) add_garbage();
+            break;
+        case 1:
+            // if (multiplayer) send_garbage(1);
+            break;
+        case 2:
+            if (multiplayer) send_garbage(1);
+            break;
+        case 3:
+            if (multiplayer) send_garbage(2);
+            break;
+        case 4:
+            if (multiplayer) send_garbage(4);
+            break;
+    }
+
+    //TODO update score and then level
+
+    if (multiplayer) level = (get_game_time() / 1000) / MP_LEVEL_TIMER + 1;
 
     cur_phase = GENERATION;
 }
@@ -835,6 +874,8 @@ int game_loop() {
     play_audio(THEMEA_SONG, false);
 
     if (multiplayer && mp_test_en) mp_test();
+
+    game_start_time = to_ms_since_boot(get_absolute_time());
 
     while (game_over == 0) {
         get_inputs();
