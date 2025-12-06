@@ -32,6 +32,8 @@ void main_menu_loop() {
     if (multiplayer) {
         mp_uart_init();
 
+        if (mp_test_en) return;
+
         //detect other console
         while (!mp_handshake_blocking(1000)) {
             tight_loop_contents();
