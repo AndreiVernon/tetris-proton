@@ -36,7 +36,7 @@ int rand_bag_loc = 0;           //index of bag
 GamePhase cur_phase = GENERATION;
 
 int frame_timer;
-int game_paused = false;
+bool game_paused = false;
 
 uint32_t game_start_time;   //in ms
 
@@ -55,7 +55,7 @@ int lowest_height_reached = M_HEIGHT;
 
 bool mp_test_en = false;
 bool multiplayer = false;
-volatile int garbage_queue = 0;   //pos is sending, neg is receiving
+volatile int garbage_queue = 0;   //neg is receiving, pos is sending
 
 const int piece_mask_sizes[7] = {5, 2, 3, 3, 3, 3, 3};
 //from bottom left to top right
@@ -416,6 +416,8 @@ void hold_piece() {
     if (!hold_avail) return;
     else hold_avail = false;
 
+    play_audio(SWITCH_OPTION_SFX, true);
+
     int temp = held_piece_shape;
     held_piece_shape = active_piece.shape;
 
@@ -520,11 +522,14 @@ bool drop_piece(int drop_count) {
 //add garbage to matrix
 void add_garbage() {
     if (!multiplayer) return;
+    if (garbage_queue >= 0) return;
+
+    play_audio(GARBAGE_SFX, true);
 
     //randomly select gap block
     int gap_x = get_rand_32_uniform_scaled(M_WIDTH);
 
-    while (garbage_queue > 0) {
+    while (garbage_queue < 0) {
         shift_lines(0, 1);
 
         //create garbage blocks
@@ -535,10 +540,8 @@ void add_garbage() {
         //if garbage covers active piece, push it out of the floor
         if (is_colliding(false)) active_piece.y++;
 
-        garbage_queue--;
+        garbage_queue++;
     }
-
-    //TODO sound effect
 }
 
 void send_garbage(int amount) {
@@ -599,6 +602,8 @@ void update_generation() {
 bool gravity_cb(repeating_timer_t *rt) {
     int *flag = (int *) rt->user_data;
     *flag += 1; //fired
+
+    if (gravity_timer_flag == 1) play_audio(SOFT_DROP_SFX, true);
 
     //repeating
     return true;
@@ -677,6 +682,8 @@ void update_falling() {
         if (drop_piece(drop_count)) {
             cancel_gravity();
             cur_phase = LOCK;
+            play_audio(TOUCH_SURFACE_SFX, true);
+            return;
         }
     }
 
@@ -684,6 +691,7 @@ void update_falling() {
     if (is_touching_surface()) {
         cancel_gravity();
         cur_phase = LOCK;
+        play_audio(TOUCH_SURFACE_SFX, true);
     }
 }
 
@@ -841,21 +849,26 @@ void update_game() {
 
 void pause_game() {
     if (!game_paused) {
-        if (mp_pause_received == 1) mp_pause_received = 0;
         game_paused = true;
+
+        if (multiplayer && mp_pause_received == 0) mp_send_msg_packed(mp_msg_pause, 0);
+        else if (multiplayer && mp_pause_received == 1) mp_pause_received = 0;
+
+        play_audio(PAUSE_SFX, true);
+        song_paused = true;
 
         cancel_generation_timer();
         cancel_gravity();
         cancel_lock_timer();
 
-        if (multiplayer) mp_send_msg_packed(mp_msg_pause, 0);
-
     } else {
         if (mp_pause_received == -1 || cur_inputs.pause) {
-            mp_pause_received = 0;
             game_paused = false;
 
-            if (multiplayer) mp_send_msg_packed(mp_msg_pause, 1);
+            if (multiplayer && mp_pause_received == 0) mp_send_msg_packed(mp_msg_pause, 1);
+            else if (multiplayer && mp_pause_received == -1) mp_pause_received = 0;
+
+            song_paused = false;
 
             return;
         }
@@ -912,11 +925,11 @@ int game_loop() {
         if (!game_paused) update_game();
 
         render_frame();
-        if (game_paused) render_dim_screen();
         while (!frame_ready) tight_loop_contents();
         frame_ready = false;
     }
 
+    //game over
     if (game_over == 1) {
         mp_send_msg(mp_msg_game_over);
         play_audio(GAME_OVER_SFX, true);

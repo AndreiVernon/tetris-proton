@@ -4,6 +4,7 @@
 #include "hardware/pwm.h"
 #include "hardware/dma.h"
 #include "hardware/clocks.h"
+#include "sound.h"
 
 #define FAST_MODE true
 
@@ -26,14 +27,15 @@
 #include "select_option.h"
 #include "switch_option.h"
 #include "stage_clear.h"
+#include "touch_surface.h"
+#include "garbage.h"
+#include "pause.h"
+#include "soft_drop.h"
 
 #define AUDIO_PIN 36
 #define SAMPLE_RATE 44100
 #define BUFFER_SIZE 256
 #define WRAP 255
-
-#define SONG_VOLUME 70
-#define SFX_VOLUME 100
 
 //buffers that store processed audio
 static uint32_t audiobuffer[2][BUFFER_SIZE];
@@ -43,6 +45,10 @@ static bool active_buffer = 0;
 //current position in audio file
 static int song_pos = 0;
 static int sfx_pos = 0;
+
+int song_volume = SONG_VOLUME_DEFAULT;
+int sfx_volume = SFX_VOLUME_DEFAULT;
+bool song_paused = false;
 
 //current audio track pointers and lengths
 static const uint8_t *curr_song = SILENCE_DATA;
@@ -81,15 +87,22 @@ static const audio_track sfx[] = {
     {SELECT_OPTION_DATA, SELECT_OPTION_DATA_LENGTH},
     {SWITCH_OPTION_DATA, SWITCH_OPTION_DATA_LENGTH},
     {STAGE_CLEAR_DATA, STAGE_CLEAR_DATA_LENGTH},
+    {TOUCH_SURFACE_DATA, TOUCH_SURFACE_DATA_LENGTH},
+    {GARBAGE_DATA, GARBAGE_DATA_LENGTH},
+    {PAUSE_DATA, PAUSE_DATA_LENGTH},
+    {SOFT_DROP_DATA, SOFT_DROP_DATA_LENGTH},
 };
 
 //mix audio and fill the buffer. we produce packed 32-bit words:
 //low 16 bits -> channel A compare, high 16 bits -> channel B compare
 static void fill_audio_buffer(int buffer_index) {
     for (int i = 0; i < BUFFER_SIZE; i++) {
-        //get song sample (loop if needed)
-        uint8_t song_sample = curr_song[song_pos];
-        song_pos = (song_pos + 1) % curr_song_len;
+        uint8_t song_sample = 128;
+        if (!song_paused) {
+            //get song sample (loop if needed)
+            song_sample = curr_song[song_pos];
+            song_pos = (song_pos + 1) % curr_song_len;
+        }
 
         //get sfx sample if active
         uint8_t sfx_sample = 128;  //default silence
@@ -109,7 +122,7 @@ static void fill_audio_buffer(int buffer_index) {
         int sfx_s  = (int)sfx_sample  - 128;
 
         //apply volumes and mix
-        int mixed_s = (song_s * SONG_VOLUME + sfx_s * SFX_VOLUME) / (100 * 2);
+        int mixed_s = (song_s * song_volume + sfx_s * sfx_volume) / (100 * 2);
 
         //clamp
         if (mixed_s < -128) mixed_s = -128;

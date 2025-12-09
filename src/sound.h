@@ -16,7 +16,16 @@
 #define SELECT_OPTION_SFX 8
 #define SWITCH_OPTION_SFX 9
 #define STAGE_CLEAR_SFX 10
+#define TOUCH_SURFACE_SFX 11
+#define GARBAGE_SFX 12
+#define PAUSE_SFX 13
+#define SOFT_DROP_SFX 14
 
+#define SONG_VOLUME_DEFAULT 70
+#define SFX_VOLUME_DEFAULT 100
+extern int song_volume;
+extern int sfx_volume;
+extern bool song_paused;
 
 void init_audio();
 void play_audio(int id, int is_sfx);

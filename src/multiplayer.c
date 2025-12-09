@@ -23,9 +23,9 @@
 static bool awaiting_pong = false;
 static bool received_pong = false;
 
-volatile bool received_ping = false;
-volatile bool mp_sync_ready = false;
-volatile int mp_pause_received = 0; //1 = pause, -1 = unpause
+bool received_ping = false;
+bool mp_sync_ready = false;
+int mp_pause_received = 0; //1 = pause, -1 = unpause
 
 //encode enum to 4-bit code
 static inline uint8_t mp_encode(mp_msg_t m) {
@@ -107,7 +107,7 @@ static void mp_on_uart_irq(void) {
                 break;
 
             case mp_msg_send_lines:
-				garbage_queue += arg;
+				garbage_queue -= arg;
                 break;
 
             case mp_msg_game_over:

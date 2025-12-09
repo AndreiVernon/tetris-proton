@@ -8,6 +8,9 @@
 #define MATRIX_OFFSET_X 11  //how many px from left pieces are drawn
 #define MATRIX_OFFSET_Y 18  //how many px from bottom pieces are drawn
 
+#define FRAME_WIDTH PANEL_WIDTH
+#define FRAME_HEIGHT PANEL_HEIGHT
+
 volatile bool frame_ready = false;   //frame ready to display
 
 int cur_frame = 0;          //current frame in 1 sec loop
@@ -107,7 +110,7 @@ void render_matrix() {
             int frame_y = MATRIX_OFFSET_Y + y * 2;
             int frame_x = MATRIX_OFFSET_X + x * 2;
 
-            if (frame_y >= PANEL_HEIGHT || frame_x >= PANEL_WIDTH) continue;
+            if (frame_y >= FRAME_HEIGHT || frame_x >= FRAME_WIDTH) continue;
             // || frame_y < 0 || frame_x < 0
 
             set_block_color(frame_y, frame_x, matrix[y][x], true);
@@ -128,7 +131,7 @@ void render_piece(Piece cur_piece, int x_offset, int y_offset) {
             int frame_y = y_offset + (y + cur_piece.y) * 2;
             int frame_x = x_offset + (x + cur_piece.x) * 2;
 
-            if (frame_y >= PANEL_HEIGHT || frame_x >= PANEL_WIDTH || frame_y < 0 || frame_x < 0) continue;
+            if (frame_y >= FRAME_HEIGHT || frame_x >= FRAME_WIDTH || frame_y < 0 || frame_x < 0) continue;
 
             set_block_color(frame_y, frame_x, cur_piece.shape, false);
         }
@@ -208,7 +211,7 @@ void render_garbage_queue() {
     //render extra wall
     int y_offset = 17;
     int x_offset = 7;
-    for (int y = y_offset; y < M_HEIGHT; y++) {
+    for (int y = y_offset; y < FRAME_HEIGHT; y++) {
         for (int x = x_offset; x < x_offset + 3; x++) {
             if (y == y_offset || x == x_offset)
                 set_pixel_color(framebuffer[!fbf_rdy][y][x], WALL, false);
@@ -218,16 +221,16 @@ void render_garbage_queue() {
     //render dark red pieces
     int garbage_drawn = 0;
     int garbage_target = -garbage_queue;
-    for (int y = y_offset + 1; y < M_WIDTH && garbage_drawn < garbage_target; y += 2) {
+    for (int y = y_offset + 1; y < FRAME_WIDTH && garbage_drawn < garbage_target; y += 2) {
         set_block_color(y, x_offset + 1, OOB, false);
     }
 }
 
 void render_dim_screen() {
-    for (int y = 0; y < M_HEIGHT; y++) {
-        for (int x = 0; x < M_WIDTH; x++) {
+    for (int y = 0; y < FRAME_HEIGHT; y++) {
+        for (int x = 0; x < FRAME_WIDTH; x++) {
             for (int px = 0; px < 3; px++) {
-                framebuffer[!fbf_rdy][y][x][0] *= 0.5;
+                framebuffer[!fbf_rdy][y][x][px] /= 2;
             }
         }
     }
@@ -250,6 +253,8 @@ void render_frame() {
 
     // render_score();
     // render_time();
+
+    if (game_paused) render_dim_screen();
 
     fbf_rdy = !fbf_rdy;
 }
