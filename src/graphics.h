@@ -9,5 +9,6 @@ extern volatile bool frame_ready;   //frame ready to display
 
 void render_frame();
 void init_frame_timer();
+void render_dim_screen();
 
 #endif

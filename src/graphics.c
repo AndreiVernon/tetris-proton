@@ -223,6 +223,16 @@ void render_garbage_queue() {
     }
 }
 
+void render_dim_screen() {
+    for (int y = 0; y < M_HEIGHT; y++) {
+        for (int x = 0; x < M_WIDTH; x++) {
+            for (int px = 0; px < 3; px++) {
+                framebuffer[!fbf_rdy][y][x][0] *= 0.5;
+            }
+        }
+    }
+}
+
 void render_frame() {
     render_background();
 

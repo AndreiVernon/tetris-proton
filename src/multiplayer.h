@@ -9,10 +9,12 @@ typedef enum {
 	mp_msg_pong        = 0x02,
 	mp_msg_send_lines  = 0x03,
 	mp_msg_game_over   = 0x04,
+	mp_msg_pause           = 0x05,
 } mp_msg_t;
 
 extern volatile bool received_ping;
 extern volatile bool mp_sync_ready;
+extern volatile int mp_pause_received;
 
 void mp_uart_init();
 bool mp_send_msg(mp_msg_t msg);

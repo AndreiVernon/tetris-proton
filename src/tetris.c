@@ -36,7 +36,7 @@ int rand_bag_loc = 0;           //index of bag
 GamePhase cur_phase = GENERATION;
 
 int frame_timer;
-int pause = false;
+int game_paused = false;
 
 uint32_t game_start_time;   //in ms
 
@@ -106,7 +106,7 @@ void init_game_blank() {
     memset(rand_bag, INACTIVE, sizeof(rand_bag));
 }
 
-inline void update_gravity() {
+void update_gravity() {
     //(0.8 - ((level - 1) * 0.007))^(level - 1)
     gravity = pow((0.8 - ((level - 1) * GRAVITY_INCREASE)), (level - 1));
 }
@@ -123,7 +123,7 @@ void reset_game() {
     score = 0;
     level = 1;
     game_over = 0;
-    pause = false;
+    game_paused = false;
     
     update_gravity();
 
@@ -481,8 +481,9 @@ int check_lines() {
         //line has been cleared
         if (cleared_cnt == M_WIDTH) {
             shift_lines(y, -1);
+            //next line was pulled down to current y, don't skip it
+            y--;
             cleared++;
-            //TODO: score up
         }
     }
 
@@ -561,11 +562,15 @@ bool oneshot_cb(repeating_timer_t *rt) {
     return false;
 }
 
+void cancel_generation_timer() {
+    cancel_repeating_timer(&generation_timer);
+    generation_timer_flag = -1;
+}
+
 void update_generation() {
     //hold piece
     if (cur_inputs.hold && hold_avail) {
-        cancel_repeating_timer(&generation_timer);
-        generation_timer_flag = -1;
+        cancel_generation_timer();
         hold_piece();
     }
 
@@ -577,7 +582,7 @@ void update_generation() {
 
     //timer has fired, now disarm
     if (generation_timer_flag == 1) {
-        generation_timer_flag = -1;
+        cancel_generation_timer();
 
         update_gravity();
 
@@ -609,7 +614,6 @@ void update_falling() {
     //soft drop no longer pressed
     if (gravity_timer_flag == 1 && !cur_inputs.soft_drop) {
         cancel_gravity();
-        gravity_timer_flag = -1;
     }
 
     if (gravity_timer_flag == -1) {
@@ -835,6 +839,29 @@ void update_game() {
 
 };
 
+void pause_game() {
+    if (!game_paused) {
+        if (mp_pause_received == 1) mp_pause_received = 0;
+        game_paused = true;
+
+        cancel_generation_timer();
+        cancel_gravity();
+        cancel_lock_timer();
+
+        if (multiplayer) mp_send_msg_packed(mp_msg_pause, 0);
+
+    } else {
+        if (mp_pause_received == -1 || cur_inputs.pause) {
+            mp_pause_received = 0;
+            game_paused = false;
+
+            if (multiplayer) mp_send_msg_packed(mp_msg_pause, 1);
+
+            return;
+        }
+    }
+}
+
 void mp_test() {
     int i = 0;
 
@@ -880,11 +907,12 @@ int game_loop() {
     while (game_over == 0) {
         get_inputs();
 
-        if (cur_inputs.pause && !multiplayer) pause = !pause;
+        if (game_paused || cur_inputs.pause || mp_pause_received != 0) pause_game();
 
-        if (!pause) update_game();
+        if (!game_paused) update_game();
 
         render_frame();
+        if (game_paused) render_dim_screen();
         while (!frame_ready) tight_loop_contents();
         frame_ready = false;
     }

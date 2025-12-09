@@ -25,6 +25,7 @@ static bool received_pong = false;
 
 volatile bool received_ping = false;
 volatile bool mp_sync_ready = false;
+volatile int mp_pause_received = 0; //1 = pause, -1 = unpause
 
 //encode enum to 4-bit code
 static inline uint8_t mp_encode(mp_msg_t m) {
@@ -33,6 +34,7 @@ static inline uint8_t mp_encode(mp_msg_t m) {
 		case mp_msg_pong:      return 0x02;
 		case mp_msg_send_lines:return 0x03;
 		case mp_msg_game_over: return 0x04;
+		case mp_msg_pause:	   return 0x05;
 		default:               return 0x00;
 	}
 }
@@ -44,6 +46,7 @@ static inline mp_msg_t mp_decode(uint8_t code) {
 		case 0x02: return mp_msg_pong;
 		case 0x03: return mp_msg_send_lines;
 		case 0x04: return mp_msg_game_over;
+		case 0x05: return mp_msg_pause;
 		default:   return mp_msg_none;
 	}
 }
@@ -110,6 +113,11 @@ static void mp_on_uart_irq(void) {
             case mp_msg_game_over:
 				game_over = -1;
                 break;
+
+			case mp_msg_pause:
+				if (arg == 0) mp_pause_received = 1;
+				if (arg == 1) mp_pause_received = -1;
+				break;
 
             default:               
                 break;

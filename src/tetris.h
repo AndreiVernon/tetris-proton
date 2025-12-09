@@ -37,20 +37,20 @@ typedef enum {
 extern uint8_t matrix[M_HEIGHT][M_WIDTH];
 extern uint32_t score;
 extern volatile int game_over;
-extern Piece active_piece;      //currently active piece
-extern Piece ghost_piece;       //ghost piece / shadow of active piece
-extern int held_piece_shape;    //shape of held piece
-extern bool hold_avail;         //can hold piece
-extern int rand_bag[14];        //bag of upcoming pieces
-extern int rand_bag_loc;        //index of bag
+extern Piece active_piece;
+extern Piece ghost_piece;
+extern int held_piece_shape;
+extern bool hold_avail;
+extern int rand_bag[14];
+extern int rand_bag_loc;
 extern GamePhase cur_phase;
 
 extern const int piece_mask_sizes[7];
-extern const uint8_t piece_masks[7][25];   //from bottom left to top right
+extern const uint8_t piece_masks[7][25];
 
 extern bool multiplayer;
 extern bool mp_test_en;
-extern volatile int garbage_queue;   //pos is sending, neg is receiving
+extern volatile int garbage_queue;
 
 int game_loop();
 void init_game_blank();

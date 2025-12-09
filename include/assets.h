@@ -103,4 +103,10 @@ const uint8_t background[64][64][3] = {
     {K, K, K, K, K, K, K, K, K, K, W, DR, DR, DR, DR, DR, DR, DR, DR, DR, DR, DR, DR, DR, DR, DR, DR, DR, DR, DR, DR, W, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K, K},
 };
 
+const bool font_mask[38][5][5] = {
+    {{1, 1, 1}, {1, 0, 1}, {1, 0, 1}, {1, 0, 1}, {1, 1, 1}}, //0
+    {{1, 0, 0, 0, 1}, {1, 0, 0, 0, 1}, {1, 0, 1, 0, 1}, {1, 1, 0, 1, 1}, {1, 0, 0, 0, 1}}, //M
+    {{1}, {0}, {1}, {1}, {1}}, //!
+};
+
 #endif
