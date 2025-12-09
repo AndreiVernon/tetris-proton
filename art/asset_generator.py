@@ -1,9 +1,5 @@
+import argparse
 from PIL import Image
-
-# ------------------------------
-# User-configurable section
-# ------------------------------
-IMAGE_PATH = "mockup_asset_gen.png"
 
 # Mapping: pixel_value → text_token
 # Pixel values must be 3-tuples of (R, G, B)
@@ -27,7 +23,15 @@ COLOR_MAP = {
 DEFAULT_TOKEN = "K"
 # ------------------------------
 
-img = Image.open(IMAGE_PATH).convert("RGB")
+parser = argparse.ArgumentParser()
+parser.add_argument("input", help="Input 64x64 image file")
+parser.add_argument("output", help="Output text file")
+parser.add_argument("--raw", action="store_true",
+                    help="Output raw pixel values instead of mapped tokens")
+
+args = parser.parse_args()
+
+img = Image.open(args.input).convert("RGB")
 w, h = img.size
 
 if (w, h) != (64, 64):
@@ -35,14 +39,18 @@ if (w, h) != (64, 64):
 
 pixels = img.load()
 
-print("uint8_t background[64][64][3] = {")
-for y in range(63, -1, -1):
-    row_tokens = []
-    for x in range(64):
-        rgb = pixels[x, y]
-        token = COLOR_MAP.get(rgb, DEFAULT_TOKEN)
-        row_tokens.append(token)
+with open(args.output, "w") as f:
+    f.write("uint8_t arr[64][64][3] = {\n")
+    for y in range(63, -1, -1):
+        row_entries = []
+        for x in range(64):
+            r, g, b = pixels[x, y]
 
-    row_str = ", ".join(row_tokens)
-    print(f"    {{{row_str}}},")
-print("};")
+            if args.raw:
+                row_entries.append(f"{{{r}, {g}, {b}}}")
+            else:
+                token = COLOR_MAP.get((r, g, b), DEFAULT_TOKEN)
+                row_entries.append(token)
+
+        f.write(f"    {{{', '.join(row_entries)}}},\n")
+    f.write("};\n")

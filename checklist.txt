@@ -29,10 +29,10 @@ X---only when no longer pressing
 X---continues to next piece after lock down if still pressed
 X-calculate time before piece locks
 X--0.5s lock delay when gravity less than 20G?
--increasing gravity
+X-increasing gravity
 X-pause menu
---with an actual pause graphic?
---iterate over framebuffer, dim everything, add pause text
+X--iterate over framebuffer, dim everything 
+--add pause text
 X-game over
 X--conditions
 X--game over screens
@@ -60,7 +60,7 @@ X--use shift_lines to move existing lines up before adding garbage at bottom
 
 Misc Logic:
 -Logic for menus / options
--System to switch between "screens" (game screen, menu screen, )
+X-System to switch between "screens" (game screen, menu screen, )
 
 Graphics:
 X-frame timing
@@ -69,7 +69,7 @@ X-frame timing
 --score and time in-game
 X-render static game elements
 X--arena, "hold", "next"
--garbage progress bar?
+X-garbage progress bar
 X-render pieces for hold
 X-render pieces for next
 X-render pieces in playfield matrix
@@ -77,49 +77,47 @@ X-render active piece
 X-render ghost piece
 X--disabled when no active piece
 X--use hard drop function to get new position
--VFX?
+-line clear effect
 
 Text:
--implement custom font
--auto kerning and spacing
+X-implement custom font
+X-auto kerning and spacing
 
 Display:
--send display data to screen with DMA
+X-send display data to screen with DMA
 
 Audio:
 X-figure out how to get audio data to pwm using DMA
--physical audio circuit
---filtering: look at pwm lab
----depends on output device?
+X-physical audio circuit
+X--filtering: look at pwm lab
+X---depends on output device?
 X-figure out format of audio
---4bit 40khz wav?
---can we efficiently store 2 4bit samples in a byte?
----i don't think so. dma only supports transferring one byte minimum at once
---probably best: just use 8bit samples
+X--4bit 40khz wav?
+X--can we efficiently store 2 4bit samples in a byte?
+X---i don't think so. dma only supports transferring one byte minimum at once
+X--probably best: just use 8bit samples
 X-figure out how to play multiple audio tracks at once for music + effects
---physically combine outputs of 2 pwm circuits
---combine them digitally by averaging signals
----mix = ((sa - 128) + (sb - 128)) / 2;
+X--physically combine outputs of 2 pwm circuits
+X--combine them digitally by averaging signals
+X---mix = ((sa - 128) + (sb - 128)) / 2;
+-allow for multiple sound effects at once
 
 Input:
 X-physical connection for NES controller to proton
 X--pcb or custom bought connector
 X--choose ports that aren't used for other things
 -detect whether plugged in
---controller disconnected = D0 pin 20 low
+--controller disconnected = D0 pin low
 --therefore every button will be read as pressed
 --if every button is pressed, we can say that controller's not working
 X-input polling / handling
 
 Multiplayer Connection:
--physical connection
---usb-a to usb-a
---can be tested without needing two protons by just connecting two sides of the same cable to different UART ports on the same proton
--initiate communication
---only if you select multiplayer menu?
--message send logic
--determine which messages need to be sent to enable gameplay
---score / lines cleared
-
-Physical design:
--?
+X-physical connection
+X--usb-a to usb-a
+X--can be tested without needing two protons by just connecting two sides of the same cable to different UART ports on the same proton
+X-initiate communication
+X--only if you select multiplayer menu?
+X-message send logic
+X-determine which messages need to be sent to enable gameplay
+X--score / lines cleared

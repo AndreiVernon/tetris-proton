@@ -1,4 +1,5 @@
 #include "pico/multicore.h"
+#include "main.h"
 #include "display.h"
 #include "input.h"
 #include "tetris.h"
@@ -6,8 +7,10 @@
 #include "sound.h"
 #include "multiplayer.h"
 
+screen_t cur_screen;
+
 void main_menu_loop() {
-    render_frame();
+    render_title();
 
     while (1) {
         get_inputs();
@@ -45,6 +48,9 @@ void main_menu_loop() {
             sleep_us(20);
         }
     }
+
+    play_audio(SILENCE_SONG, false);
+    fadeout(250);
 }
 
 int main() {
@@ -59,27 +65,18 @@ int main() {
 
     init_game_blank();
 
-    main_menu_loop();
+    cur_screen = title_screen;
 
-    game_loop();
-
-    //keep rendering last frame forever
-    //replace this with menu system
     while (1) {
-        render_frame();
-        while (!frame_ready) tight_loop_contents();
-        frame_ready = false;
+        switch (cur_screen) {
+            case title_screen:
+                main_menu_loop();
+                break;
+            case game_screen:
+                game_loop();
+                break;
+        }
     }
 
     return 0;
-}
-
-void gen_menu_loop() {
-
-    //declare variables: which menu item is selected
-
-    //while game not started
-        //get inputs
-        //based on input change the selected audio
-        //
 }

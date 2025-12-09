@@ -3,6 +3,7 @@
 #include <string.h>
 #include "pico/stdlib.h"
 #include "pico/rand.h"
+#include "main.h"
 #include "tetris.h"
 #include "graphics.h"
 #include "input.h"
@@ -900,14 +901,15 @@ void mp_test() {
             i++;
         }
 
-        render_frame();
+        render_frame(true);
     }
 }
 
-int game_loop() {
+void game_loop() {
     reset_game();
 
-    render_frame();
+    render_frame(false);
+    fadein(250);
     play_audio(GAME_START_SFX, true);
     sleep_ms(3200);
 
@@ -924,12 +926,13 @@ int game_loop() {
 
         if (!game_paused) update_game();
 
-        render_frame();
+        render_frame(true);
         while (!frame_ready) tight_loop_contents();
         frame_ready = false;
     }
 
     //game over
+    //TODO: change based on screen
     if (game_over == 1) {
         mp_send_msg(mp_msg_game_over);
         play_audio(GAME_OVER_SFX, true);
@@ -937,6 +940,7 @@ int game_loop() {
     }
 
     if (game_over == -1) {
+        play_audio(GAME_WIN_SFX, true);
         memset(matrix, S_PIECE, sizeof(matrix));
     }
 
@@ -945,7 +949,9 @@ int game_loop() {
 
     play_audio(SILENCE_SONG, false);
 
-    while (true) render_frame();
+    render_frame(true);
+    sleep_ms(3000);
+    fadeout(500);
 
-    return 0;
+    cur_screen = game_over_screen;
 }

@@ -1,4 +1,5 @@
 #include "pico/stdlib.h"
+#include <stdio.h>
 #include <string.h>
 #include "graphics.h"
 #include "tetris.h"
@@ -10,6 +11,8 @@
 
 #define FRAME_WIDTH PANEL_WIDTH
 #define FRAME_HEIGHT PANEL_HEIGHT
+#define FONT_HEIGHT 5
+#define LETTER_SPACING 1
 
 volatile bool frame_ready = false;   //frame ready to display
 
@@ -38,14 +41,6 @@ void init_frame_timer() {
     irq_set_enabled(TIMER0_IRQ_0, true);
     // set timer
     timer0_hw->alarm[0] = timer_hw->timerawl + 1000000 / TARGET_FRAMERATE;
-}
-
-void render_menu() {
-
-}
-
-void render_background() {
-    memcpy(framebuffer[!fbf_rdy], background, sizeof(framebuffer[!fbf_rdy]));
 }
 
 void set_pixel_color(uint8_t *arr, uint8_t shape_id, bool dim) {
@@ -82,6 +77,9 @@ void set_pixel_color(uint8_t *arr, uint8_t shape_id, bool dim) {
             break;
         case OOB:
             memcpy(arr, ((uint8_t[3])DARK_RED), 3);
+            break;
+        case SELECTED_TEXT:
+            memcpy(arr, ((uint8_t[3])WARM_WHITE), 3);
             break;
         default:
             memcpy(arr, ((uint8_t[3])BLACK), 3);
@@ -207,6 +205,90 @@ void render_next() {
     }
 }
 
+//map char to font index (0-37)
+//returns -2 for space, -1 for unknown
+int char_to_idx(char c) {
+        if (c >= '0' && c <= '9') return c - '0';
+        if (c >= 'a' && c <= 'z') c = c - 'a' + 'A';
+        if (c >= 'A' && c <= 'Z') return 10 + (c - 'A');
+        if (c == ':') return 36;
+        if (c == '!') return 37;
+        if (c == ' ') return -2;
+        return -1;
+};
+
+void draw_text(const char *s, int x, int y, bool center, uint8_t shape_id)
+{
+    //compute total pixel width of the string
+    int total_w = 0;
+    int len = 0;
+    for (const char *p = s; *p; ++p) {
+        int idx = char_to_idx(*p);
+        if (idx >= 0) {
+            total_w += font_widths[idx];
+            ++len;
+        } else if (idx == -2) {
+            total_w += 3; //space width
+            ++len;
+        } else {
+            total_w += 1; //unknown char == 1 blank column
+            ++len;
+        }
+    }
+
+    if (len > 0) total_w += (len - 1) * LETTER_SPACING;
+
+    //determine bottom-left origin for drawing
+    int origin_x = x;
+    int origin_y = y;
+
+    if (center) origin_x = x - (total_w / 2);
+
+    //draw each char left-to-right
+    int cursor_x = origin_x;
+
+    for (const char *p = s; *p; ++p) {
+        int idx = char_to_idx(*p);
+
+        //space
+        if (idx == -2) {
+            cursor_x += 3;
+            cursor_x += LETTER_SPACING;
+            continue;
+        }
+
+        //unknown char
+        if (idx == -1) {
+            cursor_x += 1;
+            cursor_x += LETTER_SPACING;
+            continue;
+        }
+
+        int w = font_widths[idx];
+
+        //draw font
+        for (int row = 0; row < FONT_HEIGHT; ++row) {
+            int fy = origin_y;
+
+            if (fy < 0 || fy >= PANEL_HEIGHT) continue;
+
+            for (int col = 0; col < w; ++col) {
+                if (!font_mask[idx][row][col]) continue;
+
+                int fx = cursor_x + col;
+
+                if (fx < 0 || fx >= PANEL_WIDTH) continue;
+
+                set_pixel_color(framebuffer[!fbf_rdy][fy][fx], shape_id, false);
+            }
+        }
+
+        //advance cursor
+        cursor_x += w;
+        cursor_x += LETTER_SPACING;
+    }
+}
+
 void render_garbage_queue() {
     //render extra wall
     int y_offset = 17;
@@ -226,18 +308,19 @@ void render_garbage_queue() {
     }
 }
 
-void render_dim_screen() {
+void dim_screen(float dim_factor) {
     for (int y = 0; y < FRAME_HEIGHT; y++) {
         for (int x = 0; x < FRAME_WIDTH; x++) {
             for (int px = 0; px < 3; px++) {
-                framebuffer[!fbf_rdy][y][x][px] /= 2;
+                framebuffer[!fbf_rdy][y][x][px] *= dim_factor;
             }
         }
     }
 }
 
-void render_frame() {
-    render_background();
+void render_frame(bool swap_fbf) {
+    //render background
+    memcpy(framebuffer[!fbf_rdy], background, sizeof(framebuffer[!fbf_rdy]));
 
     render_matrix();
 
@@ -251,10 +334,83 @@ void render_frame() {
 
     if (multiplayer) render_garbage_queue();
 
-    // render_score();
-    // render_time();
+    char text[32];
 
-    if (game_paused) render_dim_screen();
+    //render score
+    snprintf(text, sizeof(text), "%6u", score);
+    draw_text(text, 20, 10, true, UNSELECTED_TEXT);
 
+    //render time
+    uint32_t cur_time = (to_ms_since_boot(get_absolute_time()) - game_start_time) / 1000;
+    snprintf(text, sizeof(text), "%2u:%2u", cur_time/60, cur_time);
+    draw_text(text, 20, 4, true, SELECTED_TEXT);
+
+    if (game_paused) dim_screen(0.5);
+
+    if (swap_fbf) fbf_rdy = !fbf_rdy;
+}
+
+void render_title() {
+    //render background
+    memcpy(framebuffer[!fbf_rdy], background, sizeof(framebuffer[!fbf_rdy]));  
+}
+
+void fadeout(int duration_ms) {
+    int frames = duration_ms * TARGET_FRAMERATE / 1000;
+    if (frames < 1) frames = 1;
+
+    //non-zero so multiplicative fade behaves well
+    const float target_brightness = 0.01f;
+    float dim_factor = powf(target_brightness, 1.0f / (float)frames);
+
+    for (int i = 0; i < frames; ++i) {
+        dim_screen(dim_factor);
+        fbf_rdy = !fbf_rdy;
+        memcpy(framebuffer[!fbf_rdy], framebuffer[fbf_rdy], sizeof(framebuffer[!fbf_rdy]));
+
+        while (!frame_ready) tight_loop_contents();
+        frame_ready = false;
+    }
+
+    //final clear to ensure fully off
+    memset(framebuffer[!fbf_rdy], 0, sizeof(framebuffer[0]));
     fbf_rdy = !fbf_rdy;
+}
+
+void fadein(int duration_ms) {
+    int frames = duration_ms * TARGET_FRAMERATE / 1000;
+    if (frames < 1) frames = 1;
+
+    //non-zero so multiplicative fade behaves well
+    const float base_brightness = 0.01f;
+    //factor > 1 so brightness grows
+    float dim_factor = powf(1.0f / base_brightness, 1.0f / (float)frames);
+
+    void *orig = malloc(sizeof(framebuffer[0]));
+    if (!orig) {
+        //fallback if allocation fails (it wont)
+        for (int i = 0; i < frames; ++i) {
+            int start = cur_frame;
+            while (cur_frame == start) tight_loop_contents();
+        }
+        return;
+    }
+
+    //save original image
+    memcpy(orig, framebuffer[!fbf_rdy], sizeof(framebuffer[0]));
+
+    dim_screen(base_brightness);
+
+    //grow multiplicatively until roughly original
+    //final loop will have exact original since no dim performed
+    for (int i = 0; i < frames; ++i) {
+        dim_screen(dim_factor);
+        fbf_rdy = !fbf_rdy;
+        memcpy(framebuffer[!fbf_rdy], orig, sizeof(framebuffer[!fbf_rdy]));
+
+        while (!frame_ready) tight_loop_contents();
+        frame_ready = false;
+    }
+
+    free(orig);
 }

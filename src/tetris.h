@@ -16,7 +16,9 @@
 #define EMPTY 67
 #define GHOST 61
 #define WALL 62
+#define UNSELECTED_TEXT 62
 #define OOB 63
+#define SELECTED_TEXT 64
 #define INACTIVE -1
 
 typedef struct {
@@ -53,7 +55,9 @@ extern bool multiplayer;
 extern bool mp_test_en;
 extern volatile int garbage_queue;
 
-int game_loop();
+extern uint32_t game_start_time;
+
+void game_loop();
 void init_game_blank();
 
 #endif

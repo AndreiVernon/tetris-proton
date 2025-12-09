@@ -31,6 +31,7 @@
 #include "garbage.h"
 #include "pause.h"
 #include "soft_drop.h"
+#include "game_win.h"
 
 #define AUDIO_PIN 36
 #define SAMPLE_RATE 44100
@@ -91,6 +92,7 @@ static const audio_track sfx[] = {
     {GARBAGE_DATA, GARBAGE_DATA_LENGTH},
     {PAUSE_DATA, PAUSE_DATA_LENGTH},
     {SOFT_DROP_DATA, SOFT_DROP_DATA_LENGTH},
+    {GAME_WIN_DATA, GAME_WIN_DATA_LENGTH},
 };
 
 //mix audio and fill the buffer. we produce packed 32-bit words:

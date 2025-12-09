@@ -90,3 +90,9 @@ davis:
 -write input gpio logic
 -create UART physical connection with USB
 -write UART logic
+
+
+----------------------------------------------
+tetris logo: 
+stalk about 1.25x wider than sides
+top bar 1.25x taller than stalk
