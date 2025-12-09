@@ -1,6 +1,8 @@
 #include "pico/stdlib.h"
 #include <stdio.h>
 #include <string.h>
+#include <stdlib.h>
+#include <math.h>
 #include "graphics.h"
 #include "tetris.h"
 #include "display.h"
@@ -337,12 +339,12 @@ void render_frame(bool swap_fbf) {
     char text[32];
 
     //render score
-    snprintf(text, sizeof(text), "%6u", score);
+    snprintf(text, sizeof(text), "%6lu", score);
     draw_text(text, 20, 10, true, UNSELECTED_TEXT);
 
     //render time
     uint32_t cur_time = (to_ms_since_boot(get_absolute_time()) - game_start_time) / 1000;
-    snprintf(text, sizeof(text), "%2u:%2u", cur_time/60, cur_time);
+    snprintf(text, sizeof(text), "%2lu:%2lu", cur_time/60, cur_time);
     draw_text(text, 20, 4, true, SELECTED_TEXT);
 
     if (game_paused) dim_screen(0.5);

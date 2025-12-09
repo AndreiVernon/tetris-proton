@@ -51,6 +51,8 @@ void main_menu_loop() {
 
     play_audio(SILENCE_SONG, false);
     fadeout(250);
+
+    cur_screen = game_screen;
 }
 
 int main() {
