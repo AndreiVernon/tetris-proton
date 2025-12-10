@@ -1,5 +1,4 @@
 Immediate Debug:
--wrong garbage levels
 
 ------
 -score
@@ -12,7 +11,7 @@ X--if quit game, tell other console to quit too
 --fadeout in main.c then fadein at beginning of each loop
 -multiplayer combined audio
 --only one console plays songs, other plays only sfx
--multiplayer detect connection loss
+X-multiplayer detect connection loss
 
 Game Logic:
 X-piece data structure

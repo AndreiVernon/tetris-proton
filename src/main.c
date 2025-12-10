@@ -11,6 +11,8 @@ screen_t cur_screen;
 
 void main_menu_loop() {
     multiplayer = false;
+    mp_sync_awaiting = false;
+    mp_sync_ready = false;
 
     int cur_sel = 0;
     int NUM_OPTS = 3;
@@ -48,18 +50,26 @@ void main_menu_loop() {
 
     if (cur_sel == 1) {
         //detect other console
-        if (mp_handshake_blocking(1000, false)) {
+        if (mp_handshake_blocking(1000)) {
             play_audio(SELECT_OPTION_SFX, true);
         } else {
             play_audio(GARBAGE_SFX, true);
             goto main_menu_loop_start;
         }
 
+        mp_sync_ready = false;
+        mp_sync_awaiting = true;
+        mp_send_msg_packed(mp_msg_ping, 2);
+        sleep_ms(1);
+
         //sync with other console
-        while (!mp_handshake_blocking(1000, true)) {
+        while (!mp_sync_ready) {
+            mp_send_msg_packed(mp_msg_ping, 2);
+
             get_inputs();
 
             if (cur_inputs.b) {
+                mp_sync_awaiting = false;
                 multiplayer = false;
                 goto main_menu_loop_start;
             }
@@ -71,6 +81,8 @@ void main_menu_loop() {
             wait_and_push_frame();
         }
 
+        mp_sync_awaiting = false;
+        mp_sync_ready = false;
         multiplayer = true;
 
         cur_screen = game_screen;

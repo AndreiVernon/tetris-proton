@@ -22,7 +22,7 @@ bool mp_send_msg(mp_msg_t msg);
 bool mp_send_msg_packed(mp_msg_t msg, uint8_t arg);
 
 //try handshake by sending ping and waiting for pong
-bool mp_handshake_blocking(uint64_t timeout_us, bool game_sync);
+bool mp_handshake_blocking(uint64_t timeout_us);
 
 
 #endif

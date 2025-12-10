@@ -7,6 +7,7 @@
 #include "hardware/irq.h"
 #include "multiplayer.h"
 #include "tetris.h"
+#include "main.h"
 
 #define UART_INST uart1
 #define UART_TX_PIN 40
@@ -100,6 +101,11 @@ static void mp_on_uart_irq(void) {
 					mp_sync_ready = true;
 				}
 
+				//if you quit after disconnection, quit other player too
+				if (arg == 2 && (!multiplayer || cur_screen != game_screen)) {
+					mp_send_msg_packed(mp_msg_game_over, 2);
+				}
+
 				received_ping = true;
                 break;
 
@@ -114,7 +120,9 @@ static void mp_on_uart_irq(void) {
 
             case mp_msg_game_over:
 				if (arg == 0) game_over = -1;
-				if (arg == 2 && multiplayer) game_over = 2;
+				if (arg == 2 && multiplayer) {
+					game_over = 2;
+				}
                 break;
 
 			case mp_msg_pause:
@@ -147,35 +155,26 @@ void mp_uart_init() {
 }
 
 //try handshake by sending ping and waiting for pong
-bool mp_handshake_blocking(uint64_t timeout_us, bool game_sync) {
+bool mp_handshake_blocking(uint64_t timeout_us) {
 	bool success = false;
 
 	received_pong = false;
 	received_ping = false;
-	mp_sync_ready = false;
-
-	if (game_sync) {
-		mp_sync_awaiting = true;
-		mp_send_msg_packed(mp_msg_ping, 2);
-	} else {
-		awaiting_pong = true;
-		mp_send_msg(mp_msg_ping);
-	}
+	awaiting_pong = true;
+	mp_send_msg(mp_msg_ping);
 
 	uint64_t wait_until_us = to_us_since_boot(get_absolute_time()) + timeout_us;
 
 	while (to_us_since_boot(get_absolute_time()) < wait_until_us) {
-		if ((game_sync && mp_sync_ready) || (!game_sync && (received_pong || received_ping))) {
+		if (received_pong || received_ping) {
 			success = true;
 			break;
 		}
 	}
 
-	mp_sync_awaiting = false;
-	awaiting_pong = false;
 	received_pong = false;
 	received_ping = false;
-	mp_sync_ready = false;
+	awaiting_pong = false;
 
 	return success;
 }

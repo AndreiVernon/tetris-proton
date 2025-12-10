@@ -308,6 +308,7 @@ void render_garbage_queue() {
     int garbage_target = -garbage_queue;
     for (int y = y_offset + 1; y < FRAME_WIDTH && garbage_drawn < garbage_target; y += 2) {
         set_block_color(y, x_offset + 1, OOB, false);
+        garbage_drawn++;
     }
 }
 
