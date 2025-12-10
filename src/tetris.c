@@ -37,7 +37,7 @@ int rand_bag_loc = 0;           //index of bag
 GamePhase cur_phase = GENERATION;
 
 int frame_timer;
-bool game_paused = false;
+int game_paused = 0; //1 = pause, 2 = mp connection lost
 
 uint32_t game_start_time;   //in ms
 uint32_t game_paused_time;  //in ms
@@ -870,7 +870,7 @@ void mp_test() {
         if (cur_inputs.rot_right) {
             int col;
 
-            if (mp_handshake_blocking(250)) col = S_PIECE;
+            if (mp_handshake_blocking(250, true)) col = S_PIECE;
             else col = Z_PIECE;
 
             matrix[i / M_WIDTH][i % M_WIDTH] = col;
@@ -884,11 +884,12 @@ void mp_test() {
 
 void pause_game() {
     pause_game_start:
-    if (!game_paused) {
-        game_paused = true;
+    if (!game_paused || game_paused == 3) {
+        if (!game_paused) game_paused = true;
+        if (game_paused == 3) game_paused = 2;
 
-        if (multiplayer && mp_pause_received == 0) mp_send_msg_packed(mp_msg_pause, 0);
-        else if (multiplayer && mp_pause_received == 1) mp_pause_received = 0;
+        if (multiplayer && mp_pause_received == 0 && game_paused != 2) mp_send_msg_packed(mp_msg_pause, 0);
+        else if (multiplayer && mp_pause_received == 1 && game_paused != 2) mp_pause_received = 0;
 
         game_paused_time = to_ms_since_boot(get_absolute_time());
 
@@ -902,7 +903,7 @@ void pause_game() {
         cur_sel = 0;
     } else {
         if (mp_pause_received == -1 || cur_inputs.pause) {
-            game_paused = false;
+            game_paused = 0;
 
             if (multiplayer && mp_pause_received == 0) mp_send_msg_packed(mp_msg_pause, 1);
             else if (multiplayer && mp_pause_received == -1) mp_pause_received = 0;
@@ -917,34 +918,54 @@ void pause_game() {
 
     render_frame();
 
-    int NUM_OPTS = 2;
-    if (cur_inputs.up) {
-        cur_sel = (cur_sel - 1 + NUM_OPTS) % NUM_OPTS;
-        play_audio(SWITCH_OPTION_SFX, true);
-    }
-
-    if (cur_inputs.down) {
-        cur_sel = (cur_sel + 1 + NUM_OPTS) % NUM_OPTS;
-        play_audio(SWITCH_OPTION_SFX, true);
-    }
-
-    if (cur_inputs.a) {        
-        if (cur_sel == 0) {
-            cur_inputs.pause = true;
-            goto pause_game_start;
+    if (game_paused == 1) {
+        int NUM_OPTS = 2;
+        if (cur_inputs.up) {
+            cur_sel = (cur_sel - 1 + NUM_OPTS) % NUM_OPTS;
+            play_audio(SWITCH_OPTION_SFX, true);
         }
 
-        if (cur_sel == 1) {
+        if (cur_inputs.down) {
+            cur_sel = (cur_sel + 1 + NUM_OPTS) % NUM_OPTS;
+            play_audio(SWITCH_OPTION_SFX, true);
+        }
+
+        if (cur_inputs.a) {        
+            if (cur_sel == 0) {
+                cur_inputs.pause = true;
+                goto pause_game_start;
+            }
+
+            if (cur_sel == 1) {
+                play_audio(SELECT_OPTION_SFX, true);
+                //todo fadeout
+                if (multiplayer) mp_send_msg_packed(mp_msg_game_over, 2);
+                game_over = 2;
+            }
+        }
+
+        draw_text("paused", 32, 50, true, UNSELECTED_TEXT);
+        draw_text("resume", 32, 30, true, cur_sel == 0 ? SELECTED_TEXT : UNSELECTED_TEXT);
+        draw_text("quit game", 32, 22, true, cur_sel == 1 ? SELECTED_TEXT : UNSELECTED_TEXT);
+    }
+
+    if (game_paused == 2) {
+        if (raw_inputs.up && raw_inputs.b) {
             play_audio(SELECT_OPTION_SFX, true);
             //todo fadeout
             if (multiplayer) mp_send_msg_packed(mp_msg_game_over, 2);
             game_over = 2;
         }
-    }
 
-    draw_text("paused", 32, 50, true, UNSELECTED_TEXT);
-    draw_text("resume", 32, 30, true, cur_sel == 0 ? SELECTED_TEXT : UNSELECTED_TEXT);
-    draw_text("quit game", 32, 22, true, cur_sel == 1 ? SELECTED_TEXT : UNSELECTED_TEXT);
+        if (mp_handshake_blocking(2500, true)) {
+            cur_inputs.pause = true;
+            goto pause_game_start;
+        }
+
+        draw_text("disconnected", 32, 50, true, Z_PIECE);
+        draw_text("press up+b", 32, 30, true, UNSELECTED_TEXT);
+        draw_text("to quit", 32, 24, true, UNSELECTED_TEXT);
+    }
 }
 
 void game_loop() {
@@ -966,6 +987,8 @@ void game_loop() {
 
     while (game_over == 0) {
         get_inputs();
+
+        if (multiplayer && game_paused != 2 && !mp_handshake_blocking(750, true)) game_paused = 3;
 
         if (game_paused || cur_inputs.pause || mp_pause_received != 0) pause_game();
 

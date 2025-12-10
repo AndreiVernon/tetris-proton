@@ -10,9 +10,12 @@
 screen_t cur_screen;
 
 void main_menu_loop() {
+    multiplayer = false;
+
     int cur_sel = 0;
     int NUM_OPTS = 3;
     while (1) {
+        main_menu_loop_start:
         get_inputs();
 
         if (cur_inputs.up) {
@@ -26,7 +29,6 @@ void main_menu_loop() {
         }
 
         if (cur_inputs.a) {
-            play_audio(SELECT_OPTION_SFX, true);
             break;
         }
 
@@ -40,30 +42,43 @@ void main_menu_loop() {
     if (cur_sel == 0) {
         multiplayer = false;
         cur_screen = game_screen;
+        play_audio(SELECT_OPTION_SFX, true);
         play_audio(SILENCE_SONG, false);
     }
 
     if (cur_sel == 1) {
-        multiplayer = true;
-
-        if (mp_test_en) return;
-
         //detect other console
-        while (!mp_handshake_blocking(1000)) {
-            tight_loop_contents();
+        if (mp_handshake_blocking(1000, false)) {
+            play_audio(SELECT_OPTION_SFX, true);
+        } else {
+            play_audio(GARBAGE_SFX, true);
+            goto main_menu_loop_start;
         }
 
         //sync with other console
-        while (!mp_sync_ready) {
-            mp_send_msg_packed(mp_msg_ping, 2);
-            sleep_us(20);
+        while (!mp_handshake_blocking(1000, true)) {
+            get_inputs();
+
+            if (cur_inputs.b) {
+                multiplayer = false;
+                goto main_menu_loop_start;
+            }
+            
+            render_title();
+            draw_text("singleplayer", 32, 23, true, UNSELECTED_TEXT);
+            draw_text("multiplayer", 32, 15, true, Z_PIECE);
+            draw_text("options", 32, 7, true, UNSELECTED_TEXT);
+            wait_and_push_frame();
         }
+
+        multiplayer = true;
 
         cur_screen = game_screen;
         play_audio(SILENCE_SONG, false);
     }
 
     if (cur_sel == 2) {
+        play_audio(SELECT_OPTION_SFX, true);
         cur_screen = options_screen;
     }
 

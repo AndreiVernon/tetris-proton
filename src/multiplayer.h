@@ -12,16 +12,17 @@ typedef enum {
 	mp_msg_pause           = 0x05,
 } mp_msg_t;
 
-extern bool received_ping;
-extern bool mp_sync_ready;
-extern int mp_pause_received;
+extern volatile bool received_ping;
+extern volatile bool mp_sync_ready;
+extern volatile bool mp_sync_awaiting;
+extern volatile int mp_pause_received;
 
 void mp_uart_init();
 bool mp_send_msg(mp_msg_t msg);
 bool mp_send_msg_packed(mp_msg_t msg, uint8_t arg);
 
 //try handshake by sending ping and waiting for pong
-bool mp_handshake_blocking(uint64_t timeout_us);
+bool mp_handshake_blocking(uint64_t timeout_us, bool game_sync);
 
 
 #endif

@@ -215,6 +215,7 @@ int char_to_idx(char c) {
         if (c >= 'A' && c <= 'Z') return 10 + (c - 'A');
         if (c == ':') return 36;
         if (c == '!') return 37;
+        if (c == '+') return 38;
         if (c == ' ') return -2;
         return -1;
 };

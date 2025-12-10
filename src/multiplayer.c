@@ -20,12 +20,13 @@
 //note:change UART1_IRQ if you use uart0
 #define UART_IRQ UART1_IRQ
 
-static bool awaiting_pong = false;
-static bool received_pong = false;
+static volatile bool awaiting_pong = false;
+static volatile bool received_pong = false;
 
-bool received_ping = false;
-bool mp_sync_ready = false;
-int mp_pause_received = 0; //1 = pause, -1 = unpause
+volatile bool received_ping = false;
+volatile bool mp_sync_ready = false;
+volatile bool mp_sync_awaiting = false;
+volatile int mp_pause_received = 0; //1 = pause, -1 = unpause
 
 //encode enum to 4-bit code
 static inline uint8_t mp_encode(mp_msg_t m) {
@@ -80,8 +81,6 @@ static inline void mp_drain_rx(void) {
 //internal IRQ handler
 //reads all bytes available and updates globals
 static void mp_on_uart_irq(void) {
-	if (!multiplayer) return;
-
 	//read all pending bytes
 	while (uart_is_readable(UART_INST)) {
 		uint8_t msg_byte = uart_getc(UART_INST);
@@ -92,17 +91,20 @@ static void mp_on_uart_irq(void) {
 
         switch(msg) {
             case mp_msg_ping:
-				if (arg == 2) {
+				//generic handshake
+				if (arg == 0) mp_send_msg(mp_msg_pong);
+
+				//sync
+				if (arg == 2 && mp_sync_awaiting) {
 					mp_send_msg_packed(mp_msg_pong, 2);
 					mp_sync_ready = true;
 				}
-				else mp_send_msg(mp_msg_pong);
 
 				received_ping = true;
                 break;
 
             case mp_msg_pong:
-				if (awaiting_pong) received_pong = true;
+				if (arg == 0 && awaiting_pong) received_pong = true;
 				if (arg == 2) mp_sync_ready = true;
                 break;
 
@@ -112,7 +114,7 @@ static void mp_on_uart_irq(void) {
 
             case mp_msg_game_over:
 				if (arg == 0) game_over = -1;
-				if (arg == 2) game_over = 2;
+				if (arg == 2 && multiplayer) game_over = 2;
                 break;
 
 			case mp_msg_pause:
@@ -145,18 +147,35 @@ void mp_uart_init() {
 }
 
 //try handshake by sending ping and waiting for pong
-bool mp_handshake_blocking(uint64_t timeout_us) {
-	mp_send_msg(mp_msg_ping);
+bool mp_handshake_blocking(uint64_t timeout_us, bool game_sync) {
+	bool success = false;
 
-	awaiting_pong = true;
 	received_pong = false;
+	received_ping = false;
+	mp_sync_ready = false;
+
+	if (game_sync) {
+		mp_sync_awaiting = true;
+		mp_send_msg_packed(mp_msg_ping, 2);
+	} else {
+		awaiting_pong = true;
+		mp_send_msg(mp_msg_ping);
+	}
 
 	uint64_t wait_until_us = to_us_since_boot(get_absolute_time()) + timeout_us;
 
-	while (to_us_since_boot(get_absolute_time()) < wait_until_us && !received_pong) {
-		tight_loop_contents();
+	while (to_us_since_boot(get_absolute_time()) < wait_until_us) {
+		if ((game_sync && mp_sync_ready) || (!game_sync && (received_pong || received_ping))) {
+			success = true;
+			break;
+		}
 	}
 
+	mp_sync_awaiting = false;
 	awaiting_pong = false;
-	return received_pong;
+	received_pong = false;
+	received_ping = false;
+	mp_sync_ready = false;
+
+	return success;
 }
