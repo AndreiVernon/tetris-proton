@@ -862,6 +862,8 @@ void pause_game() {
         cancel_gravity();
         cancel_lock_timer();
 
+        render_frame(true);
+
     } else {
         if (mp_pause_received == -1 || cur_inputs.pause) {
             game_paused = false;
@@ -908,8 +910,8 @@ void mp_test() {
 void game_loop() {
     reset_game();
 
-    render_frame(false);
-    fadein(250);
+    render_frame(true);
+    //fadein(250);
     play_audio(GAME_START_SFX, true);
     sleep_ms(3200);
 
@@ -926,7 +928,7 @@ void game_loop() {
 
         if (!game_paused) update_game();
 
-        render_frame(true);
+        if (!game_paused) render_frame(true);
         while (!frame_ready) tight_loop_contents();
         frame_ready = false;
     }
@@ -951,7 +953,7 @@ void game_loop() {
 
     render_frame(true);
     sleep_ms(3000);
-    fadeout(500);
+    //fadeout(500);
 
     cur_screen = game_over_screen;
 }

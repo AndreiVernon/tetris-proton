@@ -12,7 +12,7 @@
 //framebuffer[id][row][col][rgb] - 3d array that stores what to display
 extern uint8_t framebuffer[2][PANEL_HEIGHT][PANEL_WIDTH][3];
 //which framebuffer is ready to present
-extern volatile bool fbf_rdy;
+extern bool fbf_rdy;
 
 void display_init();
 void display_clear();

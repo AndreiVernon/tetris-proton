@@ -10,7 +10,7 @@
 screen_t cur_screen;
 
 void main_menu_loop() {
-    render_title();
+    render_title(true);
 
     while (1) {
         get_inputs();
@@ -33,8 +33,6 @@ void main_menu_loop() {
     }
 
     if (multiplayer) {
-        mp_uart_init();
-
         if (mp_test_en) return;
 
         //detect other console
@@ -50,7 +48,7 @@ void main_menu_loop() {
     }
 
     play_audio(SILENCE_SONG, false);
-    fadeout(250);
+    //fadeout(250);
 
     cur_screen = game_screen;
 }
@@ -60,7 +58,7 @@ int main() {
     display_init();
     init_inputs();
     init_audio();
-    //mp_uart_init();
+    mp_uart_init();
 
     multicore_launch_core1(display_loop);
     init_frame_timer();
@@ -76,6 +74,10 @@ int main() {
                 break;
             case game_screen:
                 game_loop();
+                break;
+            case game_over_screen:
+                break;
+            case options_screen:
                 break;
         }
     }

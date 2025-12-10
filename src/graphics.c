@@ -1,8 +1,8 @@
 #include "pico/stdlib.h"
 #include <stdio.h>
 #include <string.h>
-#include <stdlib.h>
 #include <math.h>
+#include <stdlib.h>
 #include "graphics.h"
 #include "tetris.h"
 #include "display.h"
@@ -320,6 +320,10 @@ void dim_screen(float dim_factor) {
     }
 }
 
+void swap_framebuffer() {
+    fbf_rdy = !fbf_rdy;
+}
+
 void render_frame(bool swap_fbf) {
     //render background
     memcpy(framebuffer[!fbf_rdy], background, sizeof(framebuffer[!fbf_rdy]));
@@ -347,14 +351,16 @@ void render_frame(bool swap_fbf) {
     snprintf(text, sizeof(text), "%2lu:%2lu", cur_time/60, cur_time);
     draw_text(text, 20, 4, true, SELECTED_TEXT);
 
-    if (game_paused) dim_screen(0.5);
+    if (game_paused) dim_screen(0.3);
 
-    if (swap_fbf) fbf_rdy = !fbf_rdy;
+    if (swap_fbf) swap_framebuffer();
 }
 
-void render_title() {
+void render_title(bool swap_fbf) {
     //render background
-    memcpy(framebuffer[!fbf_rdy], background, sizeof(framebuffer[!fbf_rdy]));  
+    memcpy(framebuffer[!fbf_rdy], title_background, sizeof(framebuffer[!fbf_rdy]));
+
+    if (swap_fbf) swap_framebuffer();
 }
 
 void fadeout(int duration_ms) {
@@ -367,7 +373,7 @@ void fadeout(int duration_ms) {
 
     for (int i = 0; i < frames; ++i) {
         dim_screen(dim_factor);
-        fbf_rdy = !fbf_rdy;
+        swap_framebuffer();
         memcpy(framebuffer[!fbf_rdy], framebuffer[fbf_rdy], sizeof(framebuffer[!fbf_rdy]));
 
         while (!frame_ready) tight_loop_contents();
@@ -376,7 +382,7 @@ void fadeout(int duration_ms) {
 
     //final clear to ensure fully off
     memset(framebuffer[!fbf_rdy], 0, sizeof(framebuffer[0]));
-    fbf_rdy = !fbf_rdy;
+    swap_framebuffer();
 }
 
 void fadein(int duration_ms) {
@@ -388,7 +394,7 @@ void fadein(int duration_ms) {
     //factor > 1 so brightness grows
     float dim_factor = powf(1.0f / base_brightness, 1.0f / (float)frames);
 
-    void *orig = malloc(sizeof(framebuffer[0]));
+    uint8_t *orig = malloc(sizeof(framebuffer[0]));
     if (!orig) {
         //fallback if allocation fails (it wont)
         for (int i = 0; i < frames; ++i) {
@@ -407,12 +413,14 @@ void fadein(int duration_ms) {
     //final loop will have exact original since no dim performed
     for (int i = 0; i < frames; ++i) {
         dim_screen(dim_factor);
-        fbf_rdy = !fbf_rdy;
+        swap_framebuffer();
         memcpy(framebuffer[!fbf_rdy], orig, sizeof(framebuffer[!fbf_rdy]));
 
         while (!frame_ready) tight_loop_contents();
         frame_ready = false;
     }
+
+    swap_framebuffer();
 
     free(orig);
 }
