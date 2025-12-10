@@ -14,7 +14,7 @@ InputState cur_inputs = {0};
 static uint64_t left_press_time, left_last_rep;
 static uint64_t right_press_time, right_last_rep;
 static bool last_move_dir; //0 = left, 1 = right
-static uint8_t down_buf, a_buf, b_buf, start_buf, select_buf;
+static uint8_t up_buf, down_buf, left_edge_buf, right_edge_buf, a_buf, b_buf, start_buf, select_buf;
 
 //das timings in microseconds
 //10 frames ~= 167ms
@@ -32,7 +32,7 @@ void init_inputs() {
     left_press_time = right_press_time = 0ULL;
     left_last_rep   = right_last_rep   = 0ULL;
     last_move_dir = false;
-    down_buf = a_buf = b_buf = start_buf = select_buf = 0;
+    up_buf = down_buf = left_edge_buf = right_edge_buf = a_buf = b_buf = start_buf = select_buf = 0;
 
     // controller gpio
     gpio_init_mask(0b111 << 18);
@@ -131,11 +131,14 @@ void get_inputs(void) {
     cur_inputs.soft_drop = raw_inputs.up;
 
     //hold and release
-    down_buf   = ((down_buf   << 1) | raw_inputs.down)   & 0b11;
-    a_buf      = ((a_buf      << 1) | raw_inputs.a)      & 0b11;
-    b_buf      = ((b_buf      << 1) | raw_inputs.b)      & 0b11;
-    start_buf  = ((start_buf  << 1) | raw_inputs.start)  & 0b11;
-    select_buf = ((select_buf << 1) | raw_inputs.select) & 0b11;
+    up_buf         = ((up_buf         << 1) | raw_inputs.up)   & 0b11;
+    down_buf       = ((down_buf       << 1) | raw_inputs.down)   & 0b11;
+    left_edge_buf  = ((left_edge_buf  << 1) | raw_inputs.left)   & 0b11;
+    right_edge_buf = ((right_edge_buf << 1) | raw_inputs.right)   & 0b11;
+    a_buf          = ((a_buf          << 1) | raw_inputs.a)      & 0b11;
+    b_buf          = ((b_buf          << 1) | raw_inputs.b)      & 0b11;
+    start_buf      = ((start_buf      << 1) | raw_inputs.start)  & 0b11;
+    select_buf     = ((select_buf     << 1) | raw_inputs.select) & 0b11;
 
     cur_inputs.rot_left  = edge_activated_u8(b_buf);
     cur_inputs.rot_right = edge_activated_u8(a_buf);
@@ -155,4 +158,14 @@ void get_inputs(void) {
         if (!last_move_dir) cur_inputs.right = false;
         else cur_inputs.left = false;
     }
+
+    //mirror menu inputs
+    cur_inputs.up = edge_activated_u8(up_buf);
+    cur_inputs.down = cur_inputs.hard_drop;
+    cur_inputs.left_edge = edge_activated_u8(left_edge_buf);
+    cur_inputs.right_edge = edge_activated_u8(right_edge_buf);
+    cur_inputs.a = cur_inputs.rot_right;
+    cur_inputs.b = cur_inputs.rot_left;
+    cur_inputs.start = cur_inputs.hold;
+    cur_inputs.select = cur_inputs.pause;
 }

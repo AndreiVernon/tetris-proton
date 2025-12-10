@@ -895,8 +895,7 @@ void mp_test() {
             i++;
         }
 
-        while (!frame_ready) tight_loop_contents();
-        frame_ready = false;
+        wait_for_next_frame();
 
         if (received_ping) {
             matrix[i / M_WIDTH][i % M_WIDTH] = O_PIECE;
@@ -908,10 +907,12 @@ void mp_test() {
 }
 
 void game_loop() {
+    play_audio(SILENCE_SONG, false);
     reset_game();
 
     render_frame(true);
     //fadein(250);
+    sleep_ms(100);
     play_audio(GAME_START_SFX, true);
     sleep_ms(3200);
 
@@ -929,8 +930,7 @@ void game_loop() {
         if (!game_paused) update_game();
 
         if (!game_paused) render_frame(true);
-        while (!frame_ready) tight_loop_contents();
-        frame_ready = false;
+        wait_for_next_frame();
     }
 
     //game over

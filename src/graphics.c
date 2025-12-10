@@ -17,32 +17,28 @@
 #define LETTER_SPACING 1
 
 volatile bool frame_ready = false;   //frame ready to display
+repeating_timer_t frame_timer;
+uint64_t frame_timer_target;
 
-int cur_frame = 0;          //current frame in 1 sec loop
-int second_start_time;      //where the current 1 sec loop starts
-
-void frametime_handler() {
-    // acknowledge irq
-    hw_clear_bits(&timer0_hw->intr, 1 << 0);
-
+bool frametime_cb(repeating_timer_t *rt) {
     frame_ready = true;
+    frame_timer_target = to_us_since_boot(get_absolute_time()) + 1000000 / TARGET_FRAMERATE;
 
-    if (cur_frame == 0)
-        second_start_time = timer_hw->timerawl;
-
-    timer0_hw->alarm[0] = second_start_time + (cur_frame + 1) * 1000000 / TARGET_FRAMERATE;
-    cur_frame = (cur_frame + 1) % TARGET_FRAMERATE;
+    //repeating
+    return true;
 }
 
 void init_frame_timer() {
-    // Enable the interrupt for our alarm
-    hw_set_bits(&timer0_hw->inte, 1 << 0);
-    // Set irq handler for alarm irq
-    irq_set_exclusive_handler(TIMER0_IRQ_0, frametime_handler);
-    // Enable the alarm irq
-    irq_set_enabled(TIMER0_IRQ_0, true);
-    // set timer
-    timer0_hw->alarm[0] = timer_hw->timerawl + 1000000 / TARGET_FRAMERATE;
+    add_repeating_timer_us(1000000 / TARGET_FRAMERATE, frametime_cb, NULL, &frame_timer);
+    frame_timer_target = to_us_since_boot(get_absolute_time()) + 1000000 / TARGET_FRAMERATE;
+}
+
+void wait_for_next_frame() {
+    u_int64_t cur_time = to_us_since_boot(get_absolute_time());
+    sleep_us(frame_timer_target - cur_time - 1);
+
+    while (!frame_ready) tight_loop_contents();
+    frame_ready = false;
 }
 
 void set_pixel_color(uint8_t *arr, uint8_t shape_id, bool dim) {
@@ -270,7 +266,7 @@ void draw_text(const char *s, int x, int y, bool center, uint8_t shape_id)
 
         //draw font
         for (int row = 0; row < FONT_HEIGHT; ++row) {
-            int fy = origin_y;
+            int fy = origin_y + row;
 
             if (fy < 0 || fy >= PANEL_HEIGHT) continue;
 
@@ -320,6 +316,62 @@ void dim_screen(float dim_factor) {
     }
 }
 
+void fadeout(int duration_ms) {
+    int frames = duration_ms * TARGET_FRAMERATE / 1000;
+    if (frames < 1) frames = 1;
+
+    //non-zero so multiplicative fade behaves well
+    const float target_brightness = 0.01f;
+    float dim_factor = powf(target_brightness, 1.0f / (float)frames);
+
+    for (int i = 0; i < frames; ++i) {
+        dim_screen(dim_factor);
+        swap_framebuffer();
+        memcpy(framebuffer[!fbf_rdy], framebuffer[fbf_rdy], sizeof(framebuffer[!fbf_rdy]));
+
+        wait_for_next_frame();
+    }
+
+    //final clear to ensure fully off
+    memset(framebuffer[!fbf_rdy], 0, sizeof(framebuffer[0]));
+    swap_framebuffer();
+}
+
+void fadein(int duration_ms) {
+    int frames = duration_ms * TARGET_FRAMERATE / 1000;
+    if (frames < 1) frames = 1;
+
+    //non-zero so multiplicative fade behaves well
+    const float base_brightness = 0.01f;
+    //factor > 1 so brightness grows
+    float dim_factor = powf(1.0f / base_brightness, 1.0f / (float)frames);
+
+    uint8_t *orig = malloc(sizeof(framebuffer[0]));
+    if (!orig) {
+        sleep_ms(duration_ms);
+        return;
+    }
+
+    //save original image
+    memcpy(orig, framebuffer[!fbf_rdy], sizeof(framebuffer[0]));
+
+    dim_screen(base_brightness);
+
+    //grow multiplicatively until roughly original
+    //final loop will have exact original since no dim performed
+    for (int i = 0; i < frames; ++i) {
+        dim_screen(dim_factor);
+        swap_framebuffer();
+        memcpy(framebuffer[!fbf_rdy], orig, sizeof(framebuffer[!fbf_rdy]));
+
+        wait_for_next_frame();
+    }
+
+    swap_framebuffer();
+
+    free(orig);
+}
+
 void swap_framebuffer() {
     fbf_rdy = !fbf_rdy;
 }
@@ -343,12 +395,12 @@ void render_frame(bool swap_fbf) {
     char text[32];
 
     //render score
-    snprintf(text, sizeof(text), "%6lu", score);
+    snprintf(text, sizeof(text), "%06lu", score);
     draw_text(text, 20, 10, true, UNSELECTED_TEXT);
 
     //render time
     uint32_t cur_time = (to_ms_since_boot(get_absolute_time()) - game_start_time) / 1000;
-    snprintf(text, sizeof(text), "%2lu:%2lu", cur_time/60, cur_time);
+    snprintf(text, sizeof(text), "%02lu:%02lu", cur_time/60, cur_time%60);
     draw_text(text, 20, 4, true, SELECTED_TEXT);
 
     if (game_paused) dim_screen(0.3);
@@ -361,66 +413,4 @@ void render_title(bool swap_fbf) {
     memcpy(framebuffer[!fbf_rdy], title_background, sizeof(framebuffer[!fbf_rdy]));
 
     if (swap_fbf) swap_framebuffer();
-}
-
-void fadeout(int duration_ms) {
-    int frames = duration_ms * TARGET_FRAMERATE / 1000;
-    if (frames < 1) frames = 1;
-
-    //non-zero so multiplicative fade behaves well
-    const float target_brightness = 0.01f;
-    float dim_factor = powf(target_brightness, 1.0f / (float)frames);
-
-    for (int i = 0; i < frames; ++i) {
-        dim_screen(dim_factor);
-        swap_framebuffer();
-        memcpy(framebuffer[!fbf_rdy], framebuffer[fbf_rdy], sizeof(framebuffer[!fbf_rdy]));
-
-        while (!frame_ready) tight_loop_contents();
-        frame_ready = false;
-    }
-
-    //final clear to ensure fully off
-    memset(framebuffer[!fbf_rdy], 0, sizeof(framebuffer[0]));
-    swap_framebuffer();
-}
-
-void fadein(int duration_ms) {
-    int frames = duration_ms * TARGET_FRAMERATE / 1000;
-    if (frames < 1) frames = 1;
-
-    //non-zero so multiplicative fade behaves well
-    const float base_brightness = 0.01f;
-    //factor > 1 so brightness grows
-    float dim_factor = powf(1.0f / base_brightness, 1.0f / (float)frames);
-
-    uint8_t *orig = malloc(sizeof(framebuffer[0]));
-    if (!orig) {
-        //fallback if allocation fails (it wont)
-        for (int i = 0; i < frames; ++i) {
-            int start = cur_frame;
-            while (cur_frame == start) tight_loop_contents();
-        }
-        return;
-    }
-
-    //save original image
-    memcpy(orig, framebuffer[!fbf_rdy], sizeof(framebuffer[0]));
-
-    dim_screen(base_brightness);
-
-    //grow multiplicatively until roughly original
-    //final loop will have exact original since no dim performed
-    for (int i = 0; i < frames; ++i) {
-        dim_screen(dim_factor);
-        swap_framebuffer();
-        memcpy(framebuffer[!fbf_rdy], orig, sizeof(framebuffer[!fbf_rdy]));
-
-        while (!frame_ready) tight_loop_contents();
-        frame_ready = false;
-    }
-
-    swap_framebuffer();
-
-    free(orig);
 }

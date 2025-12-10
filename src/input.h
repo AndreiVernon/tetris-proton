@@ -12,6 +12,8 @@ typedef struct {
     bool rot_left, rot_right;
     bool soft_drop, hard_drop;
     bool hold, pause;
+
+    bool up, down, left_edge, right_edge, a, b, select, start; //for menus
 } InputState;
 
 extern RawInputState raw_inputs;

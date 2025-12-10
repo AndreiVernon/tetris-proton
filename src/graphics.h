@@ -7,9 +7,11 @@
 
 extern volatile bool frame_ready;   //frame ready to display
 
+void init_frame_timer();
+void wait_for_next_frame();
+
 void render_frame(bool swap_fbf);
 void render_title(bool swap_fbf);
-void init_frame_timer();
 void swap_framebuffer();
 void draw_text(const char *s, int x, int y, bool center, uint8_t shape_id);
 void fadeout(int duration_ms);

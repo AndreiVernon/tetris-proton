@@ -10,29 +10,43 @@
 screen_t cur_screen;
 
 void main_menu_loop() {
-    render_title(true);
-
+    int cur_sel = 0;
+    int NUM_OPTS = 3;
     while (1) {
         get_inputs();
 
-        if (cur_inputs.left) {
-            multiplayer = true;
+        if (cur_inputs.up) {
+            cur_sel = (cur_sel - 1 + NUM_OPTS) % NUM_OPTS;
+            play_audio(SWITCH_OPTION_SFX, true);
+        }
+
+        if (cur_inputs.down) {
+            cur_sel = (cur_sel + 1 + NUM_OPTS) % NUM_OPTS;
+            play_audio(SWITCH_OPTION_SFX, true);
+        }
+
+        if (cur_inputs.a) {
+            play_audio(SELECT_OPTION_SFX, true);
             break;
         }
 
-        if (cur_inputs.pause) {
-            multiplayer = true;
-            mp_test_en = true;
-            break;
-        }
-
-        if (cur_inputs.right) {
-            multiplayer = false;
-            break;
-        }
+        render_title(false);
+        draw_text("singleplayer", 32, 23, true, cur_sel == 0 ? SELECTED_TEXT : UNSELECTED_TEXT);
+        draw_text("multiplayer", 32, 15, true, cur_sel == 1 ? SELECTED_TEXT : UNSELECTED_TEXT);
+        draw_text("options", 32, 7, true, cur_sel == 2 ? SELECTED_TEXT : UNSELECTED_TEXT);
+        swap_framebuffer();
+        wait_for_next_frame();
     }
 
-    if (multiplayer) {
+    if (cur_sel == 0) {
+        multiplayer = false;
+        cur_screen = game_screen;
+        play_audio(SILENCE_SONG, false);
+    }
+
+    if (cur_sel == 1) {
+        multiplayer = true;
+
         if (mp_test_en) return;
 
         //detect other console
@@ -45,12 +59,16 @@ void main_menu_loop() {
             mp_send_msg_packed(mp_msg_ping, 2);
             sleep_us(20);
         }
+
+        cur_screen = game_screen;
+        play_audio(SILENCE_SONG, false);
     }
 
-    play_audio(SILENCE_SONG, false);
-    //fadeout(250);
+    if (cur_sel == 2) {
+        cur_screen = options_screen;
+    }
 
-    cur_screen = game_screen;
+    //fadeout(250);
 }
 
 int main() {
@@ -78,6 +96,7 @@ int main() {
             case game_over_screen:
                 break;
             case options_screen:
+                main_menu_loop();
                 break;
         }
     }
