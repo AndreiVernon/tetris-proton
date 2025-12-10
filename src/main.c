@@ -109,6 +109,7 @@ int main() {
     mp_uart_init();
 
     multicore_launch_core1(display_loop);
+    get_target_framerate();
     init_frame_timer();
 
     init_game_blank();

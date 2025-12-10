@@ -3,12 +3,15 @@
 
 #include "pico/stdlib.h"
 
-#define TARGET_FRAMERATE 120
+//#define TARGET_FRAMERATE 120
+
+extern int TARGET_FRAMERATE;
 
 extern volatile bool frame_ready;   //frame ready to display
 
 void init_frame_timer();
 void wait_and_push_frame();
+void get_target_framerate();
 
 void render_frame();
 void render_title();

@@ -1,4 +1,8 @@
 #include "pico/stdlib.h"
+#include "hardware/pio.h"
+#include "hardware/clocks.h"
+#include "hardware/irq.h"
+#include "hub75.pio.h"
 #include "hardware/dma.h"
 #include "hardware/gpio.h"
 #include <string.h>
@@ -201,6 +205,115 @@ void display_test_pattern() {
         for (int x = 32; x < 64; ++x) display_set_pixel(x, y, 255, 255, 0);    // bottom-right yellow
     }
 }
+
+void pio_loop() {
+    PIO pio = pio0;
+    int sm_data = 0;
+
+    uint offset = pio_add_program(pio, &hub75_data_rgb888_program);
+
+    /*configure pins for pio SM*/
+    for (uint i = DATA_BASE_PIN; i < DATA_BASE_PIN + 6; ++i) pio_gpio_init(pio, i);
+    pio_gpio_init(pio, CLK);
+
+    pio_sm_config c = hub75_data_rgb888_program_get_default_config(offset);
+    sm_config_set_out_pins(&c, DATA_BASE_PIN, 6);
+    sm_config_set_sideset_pins(&c, CLK);
+    /*tx fifo joined tx (32-bit pushes)*/
+    sm_config_set_out_shift(&c, true, true, 24);
+    sm_config_set_in_shift(&c, false, false, 32);
+    sm_config_set_fifo_join(&c, PIO_FIFO_JOIN_TX);
+
+    pio_sm_init(pio, sm_data, offset, &c);
+    /*start entry point so SM cycles through wrap forever*/
+    pio_sm_exec(pio, sm_data, offset + hub75_data_rgb888_offset_entry_point);
+    pio_sm_set_enabled(pio, sm_data, true);
+
+    /*temp per-row buffers (top/bottom lanes)*/
+    static uint32_t rowbuf[2][PANEL_WIDTH];
+
+    /*main refresh loop (cpu drives row+lat+oe, pio consumes pixel words)
+      this mirrors display_refresh: iterate bit-planes MSB-first and use even/odd
+      half-row ordering to reduce perceived flicker. no conversions; framebuffer
+      format is assumed identical (8-bit r,g,b per channel). */
+    while (1) {
+        /*for each bit-plane (msb first)*/
+        for (uint8_t bit_plane = 0; bit_plane < BCM_BITS; ++bit_plane) {
+            /*translate to preshift amount used by the pio program (keep same mapping
+              as original code: bit = 7 - bit_plane) */
+            uint8_t bit = 7 - bit_plane;
+
+            /*patch the pio preshift instruction once per bit-plane*/
+            uint16_t instr;
+            if (bit == 0) instr = pio_encode_pull(false, true);
+            else instr = pio_encode_out(pio_null, bit);
+            pio->instr_mem[offset + hub75_data_rgb888_offset_shift0] = instr;
+            pio->instr_mem[offset + hub75_data_rgb888_offset_shift1] = instr;
+
+            /*scan half-rows in same even-then-odd order as display_refresh*/
+            for (uint8_t start = 0; start < 2; ++start) {
+                for (uint8_t rowsel = start; rowsel < (PANEL_HEIGHT / 2); rowsel += 2) {
+
+                    /*build top & bottom 24-bit per-column words directly from framebuffer
+                      format: 0xRRGGBB (no gamma / no 565 conversion) */
+                    const int top_base = (PANEL_HEIGHT - 1) - rowsel;
+                    const int bot_base = (PANEL_HEIGHT / 2 - 1) - rowsel;
+
+                    for (int x = 0; x < PANEL_WIDTH; ++x) {
+                        uint8_t r1 = framebuffer[fbf_rdy][top_base][x][0];
+                        uint8_t g1 = framebuffer[fbf_rdy][top_base][x][1];
+                        uint8_t b1 = framebuffer[fbf_rdy][top_base][x][2];
+
+                        uint8_t r2 = framebuffer[fbf_rdy][bot_base][x][0];
+                        uint8_t g2 = framebuffer[fbf_rdy][bot_base][x][1];
+                        uint8_t b2 = framebuffer[fbf_rdy][bot_base][x][2];
+
+                        rowbuf[0][x] = ((uint32_t)r1 << 16) | ((uint32_t)g1 << 8) | (uint32_t)b1;
+                        rowbuf[1][x] = ((uint32_t)r2 << 16) | ((uint32_t)g2 << 8) | (uint32_t)b2;
+                    }
+
+                    /*push pixels: two 32-bit words per column (top lane, bottom lane)*/
+                    for (int x = 0; x < PANEL_WIDTH; ++x) {
+                        pio_sm_put_blocking(pio, sm_data, rowbuf[0][x]);
+                        pio_sm_put_blocking(pio, sm_data, rowbuf[1][x]);
+                    }
+
+                    /*dummy pixels to clock final bits through pio (one per lane)*/
+                    pio_sm_put_blocking(pio, sm_data, 0);
+                    pio_sm_put_blocking(pio, sm_data, 0);
+
+                    /*wait for SM to finish (stall on empty TX FIFO)*/
+                    uint32_t txstall_mask = 1u << (PIO_FDEBUG_TXSTALL_LSB + sm_data);
+                    pio->fdebug = txstall_mask;
+                    while (!(pio->fdebug & txstall_mask)) tight_loop_contents();
+
+                    /*set row address*/
+                    send_row_address(rowsel);
+
+                    /*pulse latch*/
+                    gpio_put(LAT, 1);
+                    busy_wait_at_least_cycles(150 * 0.3);
+                    gpio_put(LAT, 0);
+
+                    /*compute OE pulse width for this bit plane (mirror display_refresh)*/
+                    uint32_t weight_us = (uint32_t)LSB_TIME_US << (BCM_BITS - 1 - bit_plane);
+
+                    /*enable outputs (active low) for the plane duration*/
+                    gpio_put(OE, 0);
+                    sleep_us(weight_us);
+                    gpio_put(OE, 1);
+                }
+            }
+        } /*end bit-plane loop*/
+
+        /*allow swap if requested (mirror display_loop: swap once per full refresh)*/
+        if (fbf_swap_request) {
+            fbf_rdy = !fbf_rdy;
+            fbf_swap_request = false;
+        }
+    } /*end while*/
+}
+
 
 void display_loop() {
     while (true) {

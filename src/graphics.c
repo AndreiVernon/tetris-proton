@@ -19,6 +19,14 @@
 
 volatile bool frame_ready = false;   //frame ready to display
 repeating_timer_t frame_timer;
+int TARGET_FRAMERATE;
+
+void get_target_framerate() {
+    uint32_t start_time = to_us_since_boot(get_absolute_time());
+    fbf_swap_request = true;
+    while (fbf_swap_request) tight_loop_contents();
+    TARGET_FRAMERATE = 1000000 / (to_us_since_boot(get_absolute_time()) - start_time);
+}
 
 bool frametime_cb(repeating_timer_t *rt) {
     frame_ready = true;
@@ -344,18 +352,18 @@ void fade(int duration_ms, bool dir) {
         wait_and_push_frame();
     }
 
-    // char text[32];
-    // uint32_t start_time = to_us_since_boot(get_absolute_time());
-    // wait_and_push_frame();
-    // start_time = to_us_since_boot(get_absolute_time()) - start_time;
-    // snprintf(text, sizeof(text), "%lu", start_time);
+    char text[32];
+    uint32_t start_time = to_us_since_boot(get_absolute_time());
+    wait_and_push_frame();
+    start_time = to_us_since_boot(get_absolute_time()) - start_time;
+    snprintf(text, sizeof(text), "%lu", start_time);
 
-    // start_time = to_ms_since_boot(get_absolute_time());
-    // while (to_ms_since_boot(get_absolute_time()) < start_time + 2000) {
-    //     memset(framebuffer[!fbf_rdy], 0, sizeof(framebuffer[0]));
-    //     draw_text(text, 20, 20, true, SELECTED_TEXT);
-    //     wait_and_push_frame();
-    // }
+    start_time = to_ms_since_boot(get_absolute_time());
+    while (to_ms_since_boot(get_absolute_time()) < start_time + 2000) {
+        memset(framebuffer[!fbf_rdy], 0, sizeof(framebuffer[0]));
+        draw_text(text, 20, 20, true, SELECTED_TEXT);
+        wait_and_push_frame();
+    }
 
     free(orig);
 }
