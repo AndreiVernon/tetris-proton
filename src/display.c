@@ -288,10 +288,6 @@ void pio_init() {
 
 // Replaces display_loop with PIO+DMA implementation
 void pio_loop() {
-    // 1. Initialize Hardware
-    // (Assuming gpio_init for A,B,C,D,E,LAT,OE was done in main or display_init)
-    hub75_pio_init();
-    hub75_dma_init();
 
     while (true) {
         // --- Refresh Logic (Previously display_refresh) ---

@@ -352,18 +352,18 @@ void fade(int duration_ms, bool dir) {
         wait_and_push_frame();
     }
 
-    char text[32];
-    uint32_t start_time = to_us_since_boot(get_absolute_time());
-    wait_and_push_frame();
-    start_time = to_us_since_boot(get_absolute_time()) - start_time;
-    snprintf(text, sizeof(text), "%lu", start_time);
+    // char text[32];
+    // uint32_t start_time = to_us_since_boot(get_absolute_time());
+    // wait_and_push_frame();
+    // start_time = to_us_since_boot(get_absolute_time()) - start_time;
+    // snprintf(text, sizeof(text), "%lu", start_time);
 
-    start_time = to_ms_since_boot(get_absolute_time());
-    while (to_ms_since_boot(get_absolute_time()) < start_time + 2000) {
-        memset(framebuffer[!fbf_rdy], 0, sizeof(framebuffer[0]));
-        draw_text(text, 20, 20, true, SELECTED_TEXT);
-        wait_and_push_frame();
-    }
+    // start_time = to_ms_since_boot(get_absolute_time());
+    // while (to_ms_since_boot(get_absolute_time()) < start_time + 2000) {
+    //     memset(framebuffer[!fbf_rdy], 0, sizeof(framebuffer[0]));
+    //     draw_text(text, 20, 20, true, SELECTED_TEXT);
+    //     wait_and_push_frame();
+    // }
 
     free(orig);
 }
