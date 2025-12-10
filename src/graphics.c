@@ -40,8 +40,8 @@ void init_frame_timer() {
 }
 
 void wait_and_push_frame() {
-    while (!frame_ready) tight_loop_contents();
-    frame_ready = false;
+    // while (!frame_ready) tight_loop_contents();
+    // frame_ready = false;
     
     fbf_swap_request = true;
     while (fbf_swap_request) tight_loop_contents();
