@@ -23,7 +23,7 @@ uint8_t matrix[M_HEIGHT][M_WIDTH] = {0};
 uint32_t score = 0;
 uint32_t level = 1;
 double gravity = 1; //secs to fall one row
-volatile int game_over = 0;
+volatile int game_over = 0; //1 = lose, -1 = win, 2 = quit
 
 Piece active_piece = {0};       //currently active piece
 Piece ghost_piece = {0};        //ghost piece / shadow of active piece
@@ -58,6 +58,8 @@ int lowest_height_reached = M_HEIGHT;
 bool mp_test_en = false;
 bool multiplayer = false;
 volatile int garbage_queue = 0;   //neg is receiving, pos is sending
+
+int cur_sel = 0; //for pause menu
 
 const int piece_mask_sizes[7] = {5, 2, 3, 3, 3, 3, 3};
 //from bottom left to top right
@@ -124,11 +126,13 @@ void reset_game() {
 
     score = 0;
     level = 1;
+    update_gravity();
+
     game_over = 0;
     game_paused = false;
     game_start_time = to_ms_since_boot(get_absolute_time());
-    
-    update_gravity();
+
+    garbage_queue = 0;
 
     //clear active and ghost pieces
     memset(&active_piece, 0, sizeof(active_piece));
@@ -850,37 +854,6 @@ void update_game() {
 
 };
 
-void pause_game() {
-    if (!game_paused) {
-        game_paused = true;
-
-        if (multiplayer && mp_pause_received == 0) mp_send_msg_packed(mp_msg_pause, 0);
-        else if (multiplayer && mp_pause_received == 1) mp_pause_received = 0;
-
-        game_paused_time = to_ms_since_boot(get_absolute_time());
-
-        play_audio(PAUSE_SFX, true);
-        song_paused = true;
-
-        cancel_generation_timer();
-        cancel_gravity();
-        cancel_lock_timer();
-    } else {
-        if (mp_pause_received == -1 || cur_inputs.pause) {
-            game_paused = false;
-
-            if (multiplayer && mp_pause_received == 0) mp_send_msg_packed(mp_msg_pause, 1);
-            else if (multiplayer && mp_pause_received == -1) mp_pause_received = 0;
-
-            game_start_time += to_ms_since_boot(get_absolute_time()) - game_paused_time;
-
-            song_paused = false;
-
-            return;
-        }
-    }
-}
-
 void mp_test() {
     int i = 0;
     received_ping = false;
@@ -909,6 +882,71 @@ void mp_test() {
     }
 }
 
+void pause_game() {
+    pause_game_start:
+    if (!game_paused) {
+        game_paused = true;
+
+        if (multiplayer && mp_pause_received == 0) mp_send_msg_packed(mp_msg_pause, 0);
+        else if (multiplayer && mp_pause_received == 1) mp_pause_received = 0;
+
+        game_paused_time = to_ms_since_boot(get_absolute_time());
+
+        play_audio(PAUSE_SFX, true);
+        song_paused = true;
+
+        cancel_generation_timer();
+        cancel_gravity();
+        cancel_lock_timer();
+
+        cur_sel = 0;
+    } else {
+        if (mp_pause_received == -1 || cur_inputs.pause) {
+            game_paused = false;
+
+            if (multiplayer && mp_pause_received == 0) mp_send_msg_packed(mp_msg_pause, 1);
+            else if (multiplayer && mp_pause_received == -1) mp_pause_received = 0;
+
+            game_start_time += to_ms_since_boot(get_absolute_time()) - game_paused_time;
+
+            song_paused = false;
+
+            return;
+        }
+    }
+
+    render_frame();
+
+    int NUM_OPTS = 2;
+    if (cur_inputs.up) {
+        cur_sel = (cur_sel - 1 + NUM_OPTS) % NUM_OPTS;
+        play_audio(SWITCH_OPTION_SFX, true);
+    }
+
+    if (cur_inputs.down) {
+        cur_sel = (cur_sel + 1 + NUM_OPTS) % NUM_OPTS;
+        play_audio(SWITCH_OPTION_SFX, true);
+    }
+
+    if (cur_inputs.a) {        
+        if (cur_sel == 0) {
+            cur_inputs.pause = true;
+            goto pause_game_start;
+        }
+
+        if (cur_sel == 1) {
+            play_audio(SELECT_OPTION_SFX, true);
+            //todo fadeout
+            if (multiplayer) mp_send_msg_packed(mp_msg_game_over, 2);
+            game_over = 2;
+        }
+    }
+
+    draw_text("paused", 32, 50, true, UNSELECTED_TEXT);
+    draw_text("resume", 32, 30, true, cur_sel == 0 ? SELECTED_TEXT : UNSELECTED_TEXT);
+    draw_text("quit game", 32, 22, true, cur_sel == 1 ? SELECTED_TEXT : UNSELECTED_TEXT);
+}
+
 void game_loop() {
     play_audio(SILENCE_SONG, false);
     reset_game();
@@ -933,12 +971,15 @@ void game_loop() {
 
         if (!game_paused) update_game();
 
-        render_frame();
+        if (!game_paused) render_frame();
         wait_and_push_frame();
     }
 
     //game over
-    //TODO: change based on screen
+    cancel_generation_timer();
+    cancel_gravity();
+    cancel_lock_timer();
+    
     if (game_over == 1) {
         mp_send_msg(mp_msg_game_over);
         play_audio(GAME_OVER_SFX, true);
@@ -948,6 +989,13 @@ void game_loop() {
     if (game_over == -1) {
         play_audio(GAME_WIN_SFX, true);
         memset(matrix, S_PIECE, sizeof(matrix));
+    }
+
+    if (game_over == 2) {
+        play_audio(SILENCE_SONG, false);
+        cur_screen = title_screen;
+        //todo fadeout
+        return;
     }
 
     active_piece.shape = INACTIVE;
@@ -960,5 +1008,5 @@ void game_loop() {
     sleep_ms(3000);
     //fadeout(500);
 
-    cur_screen = game_over_screen;
+    cur_screen = title_screen;
 }

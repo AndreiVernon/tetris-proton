@@ -1,5 +1,14 @@
 Immediate Debug:
 
+-score
+-levels
+-pause menu
+--if quit game, tell other console to quit too
+-options menu
+-game over menu
+-fade between screens
+--fadeout in main.c then fadein at beginning of each loop
+
 Game Logic:
 X-piece data structure
 X-playfield matrix data structure
@@ -32,7 +41,7 @@ X--0.5s lock delay when gravity less than 20G?
 X-increasing gravity
 X-pause menu
 X--iterate over framebuffer, dim everything 
---add pause text
+X--add pause text
 X-game over
 X--conditions
 X--game over screens

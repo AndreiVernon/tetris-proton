@@ -111,7 +111,8 @@ static void mp_on_uart_irq(void) {
                 break;
 
             case mp_msg_game_over:
-				game_over = -1;
+				if (arg == 0) game_over = -1;
+				if (arg == 2) game_over = 2;
                 break;
 
 			case mp_msg_pause:

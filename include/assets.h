@@ -6,7 +6,7 @@
 #define V 1
 #define FULL_WHITE {255, 255, 255}
 #define DEFAULT_WHITE {255*V, 255*V, 255*V}
-#define WARM_WHITE {243, 255, 76}
+#define WARM_WHITE {255, 230, 70}
 #define BLACK {0, 0, 0}
 #define DARK_GREY {30, 30, 30}
 #define DARK_BLUE {0, 8, 255}

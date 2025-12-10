@@ -15,6 +15,7 @@
 #define FRAME_HEIGHT PANEL_HEIGHT
 #define FONT_HEIGHT 5
 #define LETTER_SPACING 1
+#define SPACE_WIDTH 1
 
 volatile bool frame_ready = false;   //frame ready to display
 repeating_timer_t frame_timer;
@@ -229,7 +230,7 @@ void draw_text(const char *s, int x, int y, bool center, uint8_t shape_id)
             total_w += font_widths[idx];
             ++len;
         } else if (idx == -2) {
-            total_w += 3; //space width
+            total_w += SPACE_WIDTH;
             ++len;
         } else {
             total_w += 1; //unknown char == 1 blank column
@@ -253,7 +254,7 @@ void draw_text(const char *s, int x, int y, bool center, uint8_t shape_id)
 
         //space
         if (idx == -2) {
-            cursor_x += 3;
+            cursor_x += SPACE_WIDTH;
             cursor_x += LETTER_SPACING;
             continue;
         }
@@ -400,7 +401,7 @@ void render_frame() {
     snprintf(text, sizeof(text), "%02lu:%02lu", cur_time/60, cur_time%60);
     draw_text(text, 20, 4, true, SELECTED_TEXT);
 
-    if (game_paused) dim_screen(0.3);
+    if (game_paused) dim_screen(0.1);
 }
 
 void render_title() {
