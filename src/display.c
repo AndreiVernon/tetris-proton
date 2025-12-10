@@ -49,7 +49,8 @@
 //framebuffer[id][row][col][rgb] - 3d array that stores what to display
 uint8_t framebuffer[2][PANEL_HEIGHT][PANEL_WIDTH][3];
 //which framebuffer is ready to present
-bool fbf_rdy;
+volatile bool fbf_rdy;
+volatile bool fbf_swap_request = false;
 
 //masks for fast operations
 static const uint32_t DATA_MASK = (1u<<R1)|(1u<<G1)|(1u<<B1)|(1u<<R2)|(1u<<G2)|(1u<<B2);
@@ -204,5 +205,10 @@ void display_test_pattern() {
 void display_loop() {
     while (true) {
         display_refresh();
+        
+        if (fbf_swap_request) {
+            fbf_rdy = !fbf_rdy;
+            fbf_swap_request = false;
+        }
     }
 }

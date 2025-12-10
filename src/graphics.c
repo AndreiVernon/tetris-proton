@@ -33,12 +33,15 @@ void init_frame_timer() {
     frame_timer_target = to_us_since_boot(get_absolute_time()) + 1000000 / TARGET_FRAMERATE;
 }
 
-void wait_for_next_frame() {
+void wait_and_push_frame() {
     u_int64_t cur_time = to_us_since_boot(get_absolute_time());
     sleep_us(frame_timer_target - cur_time - 1);
 
     while (!frame_ready) tight_loop_contents();
     frame_ready = false;
+    
+    fbf_swap_request = true;
+    while (fbf_swap_request) tight_loop_contents();
 }
 
 void set_pixel_color(uint8_t *arr, uint8_t shape_id, bool dim) {
@@ -326,15 +329,13 @@ void fadeout(int duration_ms) {
 
     for (int i = 0; i < frames; ++i) {
         dim_screen(dim_factor);
-        swap_framebuffer();
+        wait_and_push_frame();
         memcpy(framebuffer[!fbf_rdy], framebuffer[fbf_rdy], sizeof(framebuffer[!fbf_rdy]));
-
-        wait_for_next_frame();
     }
 
     //final clear to ensure fully off
     memset(framebuffer[!fbf_rdy], 0, sizeof(framebuffer[0]));
-    swap_framebuffer();
+    wait_and_push_frame();
 }
 
 void fadein(int duration_ms) {
@@ -361,22 +362,16 @@ void fadein(int duration_ms) {
     //final loop will have exact original since no dim performed
     for (int i = 0; i < frames; ++i) {
         dim_screen(dim_factor);
-        swap_framebuffer();
+        wait_and_push_frame();
         memcpy(framebuffer[!fbf_rdy], orig, sizeof(framebuffer[!fbf_rdy]));
-
-        wait_for_next_frame();
     }
 
-    swap_framebuffer();
+    wait_and_push_frame();
 
     free(orig);
 }
 
-void swap_framebuffer() {
-    fbf_rdy = !fbf_rdy;
-}
-
-void render_frame(bool swap_fbf) {
+void render_frame() {
     //render background
     memcpy(framebuffer[!fbf_rdy], background, sizeof(framebuffer[!fbf_rdy]));
 
@@ -399,18 +394,15 @@ void render_frame(bool swap_fbf) {
     draw_text(text, 20, 10, true, UNSELECTED_TEXT);
 
     //render time
-    uint32_t cur_time = (to_ms_since_boot(get_absolute_time()) - game_start_time) / 1000;
+    uint32_t cur_time;
+    if (!game_paused) cur_time = (to_ms_since_boot(get_absolute_time()) - game_start_time) / 1000;
+    else cur_time = (game_paused_time - game_start_time) / 1000;
     snprintf(text, sizeof(text), "%02lu:%02lu", cur_time/60, cur_time%60);
     draw_text(text, 20, 4, true, SELECTED_TEXT);
 
     if (game_paused) dim_screen(0.3);
-
-    if (swap_fbf) swap_framebuffer();
 }
 
-void render_title(bool swap_fbf) {
-    //render background
+void render_title() {
     memcpy(framebuffer[!fbf_rdy], title_background, sizeof(framebuffer[!fbf_rdy]));
-
-    if (swap_fbf) swap_framebuffer();
 }

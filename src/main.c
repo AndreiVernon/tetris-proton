@@ -30,12 +30,11 @@ void main_menu_loop() {
             break;
         }
 
-        render_title(false);
+        render_title();
         draw_text("singleplayer", 32, 23, true, cur_sel == 0 ? SELECTED_TEXT : UNSELECTED_TEXT);
         draw_text("multiplayer", 32, 15, true, cur_sel == 1 ? SELECTED_TEXT : UNSELECTED_TEXT);
         draw_text("options", 32, 7, true, cur_sel == 2 ? SELECTED_TEXT : UNSELECTED_TEXT);
-        swap_framebuffer();
-        wait_for_next_frame();
+        wait_and_push_frame();
     }
 
     if (cur_sel == 0) {

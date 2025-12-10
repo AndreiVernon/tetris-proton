@@ -40,6 +40,7 @@ int frame_timer;
 bool game_paused = false;
 
 uint32_t game_start_time;   //in ms
+uint32_t game_paused_time;  //in ms
 
 int generation_timer_flag = -1;     //-1 = not armed, 0 = armed, 1 = fired
 repeating_timer_t generation_timer = {0};
@@ -125,6 +126,7 @@ void reset_game() {
     level = 1;
     game_over = 0;
     game_paused = false;
+    game_start_time = to_ms_since_boot(get_absolute_time());
     
     update_gravity();
 
@@ -855,21 +857,22 @@ void pause_game() {
         if (multiplayer && mp_pause_received == 0) mp_send_msg_packed(mp_msg_pause, 0);
         else if (multiplayer && mp_pause_received == 1) mp_pause_received = 0;
 
+        game_paused_time = to_ms_since_boot(get_absolute_time());
+
         play_audio(PAUSE_SFX, true);
         song_paused = true;
 
         cancel_generation_timer();
         cancel_gravity();
         cancel_lock_timer();
-
-        render_frame(true);
-
     } else {
         if (mp_pause_received == -1 || cur_inputs.pause) {
             game_paused = false;
 
             if (multiplayer && mp_pause_received == 0) mp_send_msg_packed(mp_msg_pause, 1);
             else if (multiplayer && mp_pause_received == -1) mp_pause_received = 0;
+
+            game_start_time += to_ms_since_boot(get_absolute_time()) - game_paused_time;
 
             song_paused = false;
 
@@ -880,8 +883,14 @@ void pause_game() {
 
 void mp_test() {
     int i = 0;
+    received_ping = false;
 
     while (1) {
+        if (received_ping) {
+            matrix[i / M_WIDTH][i % M_WIDTH] = O_PIECE;
+            i++;
+        }
+
         received_ping = false;
         get_inputs();
 
@@ -895,14 +904,8 @@ void mp_test() {
             i++;
         }
 
-        wait_for_next_frame();
-
-        if (received_ping) {
-            matrix[i / M_WIDTH][i % M_WIDTH] = O_PIECE;
-            i++;
-        }
-
-        render_frame(true);
+        render_frame();
+        wait_and_push_frame();
     }
 }
 
@@ -910,7 +913,8 @@ void game_loop() {
     play_audio(SILENCE_SONG, false);
     reset_game();
 
-    render_frame(true);
+    render_frame();
+    wait_and_push_frame();
     //fadein(250);
     sleep_ms(100);
     play_audio(GAME_START_SFX, true);
@@ -929,8 +933,8 @@ void game_loop() {
 
         if (!game_paused) update_game();
 
-        if (!game_paused) render_frame(true);
-        wait_for_next_frame();
+        render_frame();
+        wait_and_push_frame();
     }
 
     //game over
@@ -951,7 +955,8 @@ void game_loop() {
 
     play_audio(SILENCE_SONG, false);
 
-    render_frame(true);
+    render_frame();
+    wait_and_push_frame();
     sleep_ms(3000);
     //fadeout(500);
 

@@ -3,16 +3,15 @@
 
 #include "pico/stdlib.h"
 
-#define TARGET_FRAMERATE 120
+#define TARGET_FRAMERATE 144
 
 extern volatile bool frame_ready;   //frame ready to display
 
 void init_frame_timer();
-void wait_for_next_frame();
+void wait_and_push_frame();
 
-void render_frame(bool swap_fbf);
-void render_title(bool swap_fbf);
-void swap_framebuffer();
+void render_frame();
+void render_title();
 void draw_text(const char *s, int x, int y, bool center, uint8_t shape_id);
 void fadeout(int duration_ms);
 void fadein(int duration_ms);

@@ -56,6 +56,7 @@ extern bool mp_test_en;
 extern volatile int garbage_queue;
 
 extern uint32_t game_start_time;
+extern uint32_t game_paused_time;
 
 void game_loop();
 void init_game_blank();
