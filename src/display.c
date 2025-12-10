@@ -142,8 +142,8 @@ static void shift_row_bitplane(uint8_t row, uint8_t bit_plane) {
     gpio_put(LAT, 1);
 
     // short hold to meet panel latch timings
-    sleep_us(1);
-    //busy_wait_at_least_cycles(100 * 0.3); //150 cycles = 1us
+    //sleep_us(1);
+    busy_wait_at_least_cycles(50 * 0.3); //150 cycles = 1us
 
     gpio_put(LAT, 0);
 

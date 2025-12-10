@@ -2,13 +2,14 @@ Immediate Debug:
 
 ------
 -score
--levels
+-combo garbage
+X-levels
 X-pause menu
 X--if quit game, tell other console to quit too
 -options menu
 -game over menu
--fade between screens
---fadeout in main.c then fadein at beginning of each loop
+X-fade between screens
+X--fadeout in main.c then fadein at beginning of each loop
 -multiplayer combined audio
 --only one console plays songs, other plays only sfx
 X-multiplayer detect connection loss

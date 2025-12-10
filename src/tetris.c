@@ -15,6 +15,10 @@
 #define GRAVITY_INCREASE 0.007
 #define GRAVITY_SOFT_MULT 20    //how much soft drop multiplies gravity by
 
+#define LINES_PER_LEVEL 5
+#define FIXED_LINES_PER_LEVEL 8
+#define FIXED_LEVEL_SYSTEM true
+
 #define LOCK_DOWN_TIMER 0.5     //in s
 #define LOCK_RESET_LIMIT 15
 
@@ -22,6 +26,7 @@ uint8_t matrix[M_HEIGHT][M_WIDTH] = {0};
 
 uint32_t score = 0;
 uint32_t level = 1;
+uint32_t total_lines_cleared = 0;
 double gravity = 1; //secs to fall one row
 volatile int game_over = 0; //1 = lose, -1 = win, 2 = quit
 
@@ -126,6 +131,7 @@ void reset_game() {
 
     score = 0;
     level = 1;
+    total_lines_cleared = 0;
     update_gravity();
 
     game_over = 0;
@@ -795,6 +801,7 @@ void update_clear() {
     lock_piece();
 
     int cleared = check_lines();
+    total_lines_cleared += cleared;
 
     //perfect clear
     if (perfect_clear_check()) {
@@ -819,9 +826,20 @@ void update_clear() {
             break;
     }
 
-    //TODO update score and then level
+    //TODO score
 
+    //update level
     if (multiplayer) level = (get_game_time() / 1000) / MP_LEVEL_TIMER + 1;
+    else {
+        if (FIXED_LEVEL_SYSTEM) {
+            double a = LINES_PER_LEVEL;
+            double L = (double)total_lines_cleared;
+            double n_real = (sqrt(a*a + 2.0*a*4.0*L) - a) / (2.0*a);
+            level = (int)n_real + 1;
+        } else {
+            level = total_lines_cleared / FIXED_LINES_PER_LEVEL;
+        }
+    }
 
     cur_phase = GENERATION;
 }
@@ -984,9 +1002,9 @@ void game_loop() {
     reset_game();
 
     render_frame();
-    wait_and_push_frame();
-    //fadein(250);
+    fade(250, 1);
     sleep_ms(100);
+
     play_audio(GAME_START_SFX, true);
     sleep_ms(3200);
 
@@ -1035,7 +1053,7 @@ void game_loop() {
     song_paused = false;
     
     if (game_over == 1) {
-        mp_send_msg(mp_msg_game_over);
+        if (multiplayer) mp_send_msg(mp_msg_game_over);
         play_audio(GAME_OVER_SFX, true);
         memset(matrix, Z_PIECE, sizeof(matrix));
     }
@@ -1060,7 +1078,7 @@ void game_loop() {
     render_frame();
     wait_and_push_frame();
     sleep_ms(3000);
-    //fadeout(500);
+    render_frame();
 
     cur_screen = title_screen;
 }

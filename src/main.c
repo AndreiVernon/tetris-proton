@@ -14,6 +14,12 @@ void main_menu_loop() {
     mp_sync_awaiting = false;
     mp_sync_ready = false;
 
+    render_title();
+    draw_text("singleplayer", 32, 23, true, SELECTED_TEXT);
+    draw_text("multiplayer", 32, 15, true, UNSELECTED_TEXT);
+    draw_text("options", 32, 7, true, UNSELECTED_TEXT);
+    fade(1000, 1);
+
     int cur_sel = 0;
     int NUM_OPTS = 3;
     while (1) {
@@ -93,8 +99,6 @@ void main_menu_loop() {
         play_audio(SELECT_OPTION_SFX, true);
         cur_screen = options_screen;
     }
-
-    //fadeout(250);
 }
 
 int main() {
@@ -125,6 +129,8 @@ int main() {
                 main_menu_loop();
                 break;
         }
+
+        fade(250, 0);
     }
 
     return 0;

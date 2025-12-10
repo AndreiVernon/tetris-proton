@@ -19,11 +19,9 @@
 
 volatile bool frame_ready = false;   //frame ready to display
 repeating_timer_t frame_timer;
-uint64_t frame_timer_target;
 
 bool frametime_cb(repeating_timer_t *rt) {
     frame_ready = true;
-    frame_timer_target = to_us_since_boot(get_absolute_time()) + 1000000 / TARGET_FRAMERATE;
 
     //repeating
     return true;
@@ -31,13 +29,9 @@ bool frametime_cb(repeating_timer_t *rt) {
 
 void init_frame_timer() {
     add_repeating_timer_us(1000000 / TARGET_FRAMERATE, frametime_cb, NULL, &frame_timer);
-    frame_timer_target = to_us_since_boot(get_absolute_time()) + 1000000 / TARGET_FRAMERATE;
 }
 
 void wait_and_push_frame() {
-    u_int64_t cur_time = to_us_since_boot(get_absolute_time());
-    sleep_us(frame_timer_target - cur_time - 1);
-
     while (!frame_ready) tight_loop_contents();
     frame_ready = false;
     
@@ -313,6 +307,8 @@ void render_garbage_queue() {
 }
 
 void dim_screen(float dim_factor) {
+    if (dim_factor == 1.0f) return;
+
     for (int y = 0; y < FRAME_HEIGHT; y++) {
         for (int x = 0; x < FRAME_WIDTH; x++) {
             for (int px = 0; px < 3; px++) {
@@ -322,54 +318,44 @@ void dim_screen(float dim_factor) {
     }
 }
 
-void fadeout(int duration_ms) {
-    int frames = duration_ms * TARGET_FRAMERATE / 1000;
+//dir: 0 = fadeout, 1 = fadein
+void fade(int duration_ms, bool dir) {
+    // int frames = (duration_ms / 1000.0f) * TARGET_FRAMERATE + 0.49f;
+    int frames = duration_ms / 25; //approx speed of display bitbanging
     if (frames < 1) frames = 1;
-
-    //non-zero so multiplicative fade behaves well
-    const float target_brightness = 0.01f;
-    float dim_factor = powf(target_brightness, 1.0f / (float)frames);
-
-    for (int i = 0; i < frames; ++i) {
-        dim_screen(dim_factor);
-        wait_and_push_frame();
-        memcpy(framebuffer[!fbf_rdy], framebuffer[fbf_rdy], sizeof(framebuffer[!fbf_rdy]));
-    }
-
-    //final clear to ensure fully off
-    memset(framebuffer[!fbf_rdy], 0, sizeof(framebuffer[0]));
-    wait_and_push_frame();
-}
-
-void fadein(int duration_ms) {
-    int frames = duration_ms * TARGET_FRAMERATE / 1000;
-    if (frames < 1) frames = 1;
-
-    //non-zero so multiplicative fade behaves well
-    const float base_brightness = 0.01f;
-    //factor > 1 so brightness grows
-    float dim_factor = powf(1.0f / base_brightness, 1.0f / (float)frames);
 
     uint8_t *orig = malloc(sizeof(framebuffer[0]));
     if (!orig) {
+        display_clear();
+        draw_text("fades broke!", 32, 32, true, Z_PIECE);
         sleep_ms(duration_ms);
         return;
     }
-
-    //save original image
     memcpy(orig, framebuffer[!fbf_rdy], sizeof(framebuffer[0]));
 
-    dim_screen(base_brightness);
+    float dim_factor;
+    for (int i = 0; i < frames; i++) {
+        memcpy(framebuffer[!fbf_rdy], orig, sizeof(framebuffer[0]));
 
-    //grow multiplicatively until roughly original
-    //final loop will have exact original since no dim performed
-    for (int i = 0; i < frames; ++i) {
+        if (!dir) dim_factor = (frames - i - 1) / (float)frames;
+        else dim_factor = (i + 1) / (float)frames;
+
         dim_screen(dim_factor);
         wait_and_push_frame();
-        memcpy(framebuffer[!fbf_rdy], orig, sizeof(framebuffer[!fbf_rdy]));
     }
 
-    wait_and_push_frame();
+    // char text[32];
+    // uint32_t start_time = to_us_since_boot(get_absolute_time());
+    // wait_and_push_frame();
+    // start_time = to_us_since_boot(get_absolute_time()) - start_time;
+    // snprintf(text, sizeof(text), "%lu", start_time);
+
+    // start_time = to_ms_since_boot(get_absolute_time());
+    // while (to_ms_since_boot(get_absolute_time()) < start_time + 2000) {
+    //     memset(framebuffer[!fbf_rdy], 0, sizeof(framebuffer[0]));
+    //     draw_text(text, 20, 20, true, SELECTED_TEXT);
+    //     wait_and_push_frame();
+    // }
 
     free(orig);
 }
@@ -396,12 +382,17 @@ void render_frame() {
     snprintf(text, sizeof(text), "%06lu", score);
     draw_text(text, 20, 10, true, UNSELECTED_TEXT);
 
+    if (multiplayer) {
     //render time
-    uint32_t cur_time;
-    if (!game_paused) cur_time = (to_ms_since_boot(get_absolute_time()) - game_start_time) / 1000;
-    else cur_time = (game_paused_time - game_start_time) / 1000;
-    snprintf(text, sizeof(text), "%02lu:%02lu", cur_time/60, cur_time%60);
-    draw_text(text, 20, 4, true, SELECTED_TEXT);
+        uint32_t cur_time;
+        if (!game_paused) cur_time = (to_ms_since_boot(get_absolute_time()) - game_start_time) / 1000;
+        else cur_time = (game_paused_time - game_start_time) / 1000;
+        snprintf(text, sizeof(text), "%02lu:%02lu", cur_time/60, cur_time%60);
+        draw_text(text, 20, 4, true, SELECTED_TEXT);
+    } else {
+        snprintf(text, sizeof(text), "Level %02lu", level);
+        draw_text(text, 20, 4, true, SELECTED_TEXT);
+    }
 
     if (game_paused) dim_screen(0.1);
 }
