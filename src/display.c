@@ -60,6 +60,13 @@ volatile bool fbf_swap_request = false;
 static const uint32_t DATA_MASK = (1u<<R1)|(1u<<G1)|(1u<<B1)|(1u<<R2)|(1u<<G2)|(1u<<B2);
 static const uint32_t ADDR_MASK = (1u<<A)|(1u<<B)|(1u<<C)|(1u<<D)|(1u<<E);
 
+uint32_t scanline_buffer[PANEL_WIDTH];
+
+// PIO and DMA globals
+PIO pio_hub75 = pio0;
+uint sm_hub75 = 0;
+uint dma_chan_hub75 = 0;
+
 void display_clear() {
     memset(framebuffer, 0, sizeof(framebuffer));
 }
@@ -206,119 +213,173 @@ void display_test_pattern() {
     }
 }
 
-void pio_loop() {
-    PIO pio = pio0;
-    int sm_data = 0;
-
-    uint offset = pio_add_program(pio, &hub75_data_rgb888_program);
-
-    /*configure pins for pio SM*/
-    for (uint i = DATA_BASE_PIN; i < DATA_BASE_PIN + 6; ++i) pio_gpio_init(pio, i);
-    pio_gpio_init(pio, CLK);
-
-    pio_sm_config c = hub75_data_rgb888_program_get_default_config(offset);
-    sm_config_set_out_pins(&c, DATA_BASE_PIN, 6);
-    sm_config_set_sideset_pins(&c, CLK);
-    /*tx fifo joined tx (32-bit pushes)*/
-    sm_config_set_out_shift(&c, true, true, 24);
-    sm_config_set_in_shift(&c, false, false, 32);
-    sm_config_set_fifo_join(&c, PIO_FIFO_JOIN_TX);
-
-    pio_sm_init(pio, sm_data, offset, &c);
-    /*start entry point so SM cycles through wrap forever*/
-    pio_sm_exec(pio, sm_data, offset + hub75_data_rgb888_offset_entry_point);
-    pio_sm_set_enabled(pio, sm_data, true);
-
-    /*temp per-row buffers (top/bottom lanes)*/
-    static uint32_t rowbuf[2][PANEL_WIDTH];
-
-    /*main refresh loop (cpu drives row+lat+oe, pio consumes pixel words)
-      this mirrors display_refresh: iterate bit-planes MSB-first and use even/odd
-      half-row ordering to reduce perceived flicker. no conversions; framebuffer
-      format is assumed identical (8-bit r,g,b per channel). */
-    while (1) {
-        /*for each bit-plane (msb first)*/
-        for (uint8_t bit_plane = 0; bit_plane < BCM_BITS; ++bit_plane) {
-            /*translate to preshift amount used by the pio program (keep same mapping
-              as original code: bit = 7 - bit_plane) */
-            uint8_t bit = 7 - bit_plane;
-
-            /*patch the pio preshift instruction once per bit-plane*/
-            uint16_t instr;
-            if (bit == 0) instr = pio_encode_pull(false, true);
-            else instr = pio_encode_out(pio_null, bit);
-            pio->instr_mem[offset + hub75_data_rgb888_offset_shift0] = instr;
-            pio->instr_mem[offset + hub75_data_rgb888_offset_shift1] = instr;
-
-            /*scan half-rows in same even-then-odd order as display_refresh*/
-            for (uint8_t start = 0; start < 2; ++start) {
-                for (uint8_t rowsel = start; rowsel < (PANEL_HEIGHT / 2); rowsel += 2) {
-
-                    /*build top & bottom 24-bit per-column words directly from framebuffer
-                      format: 0xRRGGBB (no gamma / no 565 conversion) */
-                    const int top_base = (PANEL_HEIGHT - 1) - rowsel;
-                    const int bot_base = (PANEL_HEIGHT / 2 - 1) - rowsel;
-
-                    for (int x = 0; x < PANEL_WIDTH; ++x) {
-                        uint8_t r1 = framebuffer[fbf_rdy][top_base][x][0];
-                        uint8_t g1 = framebuffer[fbf_rdy][top_base][x][1];
-                        uint8_t b1 = framebuffer[fbf_rdy][top_base][x][2];
-
-                        uint8_t r2 = framebuffer[fbf_rdy][bot_base][x][0];
-                        uint8_t g2 = framebuffer[fbf_rdy][bot_base][x][1];
-                        uint8_t b2 = framebuffer[fbf_rdy][bot_base][x][2];
-
-                        rowbuf[0][x] = ((uint32_t)r1 << 16) | ((uint32_t)g1 << 8) | (uint32_t)b1;
-                        rowbuf[1][x] = ((uint32_t)r2 << 16) | ((uint32_t)g2 << 8) | (uint32_t)b2;
-                    }
-
-                    /*push pixels: two 32-bit words per column (top lane, bottom lane)*/
-                    for (int x = 0; x < PANEL_WIDTH; ++x) {
-                        pio_sm_put_blocking(pio, sm_data, rowbuf[0][x]);
-                        pio_sm_put_blocking(pio, sm_data, rowbuf[1][x]);
-                    }
-
-                    /*dummy pixels to clock final bits through pio (one per lane)*/
-                    pio_sm_put_blocking(pio, sm_data, 0);
-                    pio_sm_put_blocking(pio, sm_data, 0);
-
-                    /*wait for SM to finish (stall on empty TX FIFO)*/
-                    uint32_t txstall_mask = 1u << (PIO_FDEBUG_TXSTALL_LSB + sm_data);
-                    pio->fdebug = txstall_mask;
-                    while (!(pio->fdebug & txstall_mask)) tight_loop_contents();
-
-                    /*set row address*/
-                    send_row_address(rowsel);
-
-                    /*pulse latch*/
-                    gpio_put(LAT, 1);
-                    busy_wait_at_least_cycles(150 * 0.3);
-                    gpio_put(LAT, 0);
-
-                    /*compute OE pulse width for this bit plane (mirror display_refresh)*/
-                    uint32_t weight_us = (uint32_t)LSB_TIME_US << (BCM_BITS - 1 - bit_plane);
-
-                    /*enable outputs (active low) for the plane duration*/
-                    gpio_put(OE, 0);
-                    sleep_us(weight_us);
-                    gpio_put(OE, 1);
-                }
-            }
-        } /*end bit-plane loop*/
-
-        /*allow swap if requested (mirror display_loop: swap once per full refresh)*/
-        if (fbf_swap_request) {
-            fbf_rdy = !fbf_rdy;
-            fbf_swap_request = false;
-        }
-    } /*end while*/
-}
 
 
 void display_loop() {
     while (true) {
         display_refresh();
         
+        if (fbf_swap_request) {
+            fbf_rdy = !fbf_rdy;
+            fbf_swap_request = false;
+        }
+    }
+}
+
+void hub75_pio_init() {
+    // Find a free state machine
+    uint offset = pio_add_program(pio_hub75, &hub75_program);
+    sm_hub75 = pio_claim_unused_sm(pio_hub75, true);
+    
+    // Configure PIO
+    pio_sm_config c = hub75_program_get_default_config(offset);
+    
+    // 1. Configure SIDESET for CLK (Pin 14)
+    sm_config_set_sideset_pins(&c, CLK);
+    pio_gpio_init(pio_hub75, CLK);
+    pio_sm_set_consecutive_pindirs(pio_hub75, sm_hub75, CLK, 1, true);
+
+    // 2. Configure OUT pins for Data (Base Pin 2, Count 6: R1..B2)
+    // Note: This relies on R1, G1, B1, R2, G2, B2 being contiguous starting at DATA_BASE_PIN
+    sm_config_set_out_pins(&c, DATA_BASE_PIN, 6);
+    for(int i=0; i<6; i++) {
+        pio_gpio_init(pio_hub75, DATA_BASE_PIN + i);
+    }
+    pio_sm_set_consecutive_pindirs(pio_hub75, sm_hub75, DATA_BASE_PIN, 6, true);
+
+    // 3. Setup FIFO (Auto-pull threshold 32 is fine, but we only need 6 bits per shift)
+    // We will shift out 6 bits, shift_right=true, autopull=true, pull_threshold=anything >=6
+    sm_config_set_out_shift(&c, true, true, 32); 
+    
+    // 4. Set Clock Divider
+    // Target roughly 10-20MHz pixel clock. RP2350 is fast, let's divide comfortably.
+    // 150MHz / 8 = 18.75MHz. Adjust 'div' if panel flickers or glitches.
+    float div = clock_get_hz(clk_sys) / 20000000.0f; 
+    sm_config_set_clkdiv(&c, div);
+
+    // Initialize and enable
+    pio_sm_init(pio_hub75, sm_hub75, offset, &c);
+    pio_sm_set_enabled(pio_hub75, sm_hub75, true);
+}
+
+void hub75_dma_init() {
+    dma_chan_hub75 = dma_claim_unused_channel(true);
+    dma_channel_config c = dma_channel_get_default_config(dma_chan_hub75);
+    
+    // Transfer 32-bit words (our scanline buffer)
+    channel_config_set_transfer_data_size(&c, DMA_SIZE_32);
+    // Increment read address (buffer), fixed write address (PIO FIFO)
+    channel_config_set_read_increment(&c, true);
+    channel_config_set_write_increment(&c, false);
+    // DREQ based on PIO TX FIFO
+    channel_config_set_dreq(&c, pio_get_dreq(pio_hub75, sm_hub75, true));
+
+    dma_channel_configure(
+        dma_chan_hub75,
+        &c,
+        &pio_hub75->txf[sm_hub75], // Write address
+        NULL,                      // Read address (set later)
+        PANEL_WIDTH,               // Transfer count
+        false                      // Don't start yet
+    );
+}
+
+void pio_init() {
+    display_init();
+    hub75_pio_init();
+    hub75_dma_init();
+}
+
+// Replaces display_loop with PIO+DMA implementation
+void pio_loop() {
+    // 1. Initialize Hardware
+    // (Assuming gpio_init for A,B,C,D,E,LAT,OE was done in main or display_init)
+    hub75_pio_init();
+    hub75_dma_init();
+
+    while (true) {
+        // --- Refresh Logic (Previously display_refresh) ---
+        
+        // Iterate over bit planes (MSB first)
+        for (uint8_t bit_plane = 0; bit_plane < BCM_BITS; bit_plane++) {
+            // Determine the bit index we are extracting (0..7)
+            const int bit_index = 7 - bit_plane;
+            const uint32_t bit_mask = (1u << bit_index);
+
+            // Iterate over interlaced rows (0..15 then 1..15)
+            // We use the exact same interlacing logic as your original code
+            for (int pass = 0; pass < 2; pass++) {
+                for (uint8_t row = pass; row < (PANEL_HEIGHT / 2); row += 2) {
+                    
+                    // --- 1. Prepare Buffer (Bit Slicing) ---
+                    // This replaces the nested loop inside shift_row_bitplane
+                    
+                    // Logic from original: top = (H-1)-row, bot = (H/2-1)-row
+                    const uint8_t top_row = (PANEL_HEIGHT - 1) - row;
+                    const uint8_t bot_row = (PANEL_HEIGHT/2 - 1) - row;
+
+                    for (int col = 0; col < PANEL_WIDTH; ++col) {
+                        uint32_t pixel_bits = 0;
+
+                        // Retrieve Top Pixel
+                        uint8_t r1 = framebuffer[fbf_rdy][top_row][col][0];
+                        uint8_t g1 = framebuffer[fbf_rdy][top_row][col][1];
+                        uint8_t b1 = framebuffer[fbf_rdy][top_row][col][2];
+
+                        // Retrieve Bottom Pixel
+                        uint8_t r2 = framebuffer[fbf_rdy][bot_row][col][0];
+                        uint8_t g2 = framebuffer[fbf_rdy][bot_row][col][1];
+                        uint8_t b2 = framebuffer[fbf_rdy][bot_row][col][2];
+
+                        // Pack bits into positions 0..5 (matching R1..B2 pin order)
+                        // R1=bit0, G1=bit1, B1=bit2, R2=bit3, G2=bit4, B2=bit5
+                        if (r1 & bit_mask) pixel_bits |= (1u << 0); // R1
+                        if (g1 & bit_mask) pixel_bits |= (1u << 1); // G1
+                        if (b1 & bit_mask) pixel_bits |= (1u << 2); // B1
+                        
+                        if (r2 & bit_mask) pixel_bits |= (1u << 3); // R2
+                        if (g2 & bit_mask) pixel_bits |= (1u << 4); // G2
+                        if (b2 & bit_mask) pixel_bits |= (1u << 5); // B2
+
+                        scanline_buffer[col] = pixel_bits;
+                    }
+
+                    // --- 2. Send Row Address ---
+                    // Disable OE (LEDs off) before address change
+                    gpio_put(OE, 1);
+                    send_row_address(row); 
+
+                    // --- 3. DMA Transfer to PIO ---
+                    // Trigger DMA to shove the buffer into the PIO FIFO
+                    dma_channel_transfer_from_buffer_now(dma_chan_hub75, scanline_buffer, PANEL_WIDTH);
+                    
+                    // Wait for the DMA to finish sending all pixels
+                    dma_channel_wait_for_finish_blocking(dma_chan_hub75);
+                    
+                    // Wait for PIO to drain (ensure last pixel is clocked out)
+                    // The DMA finishes when it writes the last word to FIFO, 
+                    // we need to wait a tiny bit for PIO to shift it out.
+                    while(!pio_sm_is_tx_fifo_empty(pio_hub75, sm_hub75)) tight_loop_contents();
+                    
+                    // Small delay to ensure the last clock pulse finished
+                    busy_wait_at_least_cycles(50);
+
+                    // --- 4. Latch & Display ---
+                    gpio_put(LAT, 1);
+                    busy_wait_at_least_cycles(50); // Hold latch
+                    gpio_put(LAT, 0);
+
+                    // BCM Delay
+                    uint32_t weight_us = (uint32_t)LSB_TIME_US << (BCM_BITS - 1 - bit_plane);
+                    
+                    gpio_put(OE, 0); // Enable Output (LEDs ON)
+                    sleep_us(weight_us);
+                    gpio_put(OE, 1); // Disable Output (LEDs OFF)
+                }
+            }
+        }
+
+        // Check for buffer swap
         if (fbf_swap_request) {
             fbf_rdy = !fbf_rdy;
             fbf_swap_request = false;

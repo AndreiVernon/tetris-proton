@@ -19,4 +19,7 @@ void display_init();
 void display_clear();
 void display_loop();
 
+void pio_init();
+void pio_loop();
+
 #endif

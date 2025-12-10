@@ -103,12 +103,17 @@ void main_menu_loop() {
 
 int main() {
     stdio_init_all();
-    display_init();
+
+    // display_init();
+    // multicore_launch_core1(display_loop);
+    pio_init();
+    multicore_launch_core1(pio_loop);
+
     init_inputs();
     init_audio();
     mp_uart_init();
 
-    multicore_launch_core1(display_loop);
+    
     get_target_framerate();
     init_frame_timer();
 

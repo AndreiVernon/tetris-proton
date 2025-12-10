@@ -1,25 +1,11 @@
-.program hub75_data_rgb888
+.program hub75
 .side_set 1
 
-public entry_point:
-.wrap_target
-public shift0:
-    pull            side 0
-    in   osr, 1     side 0
-    out  null, 8    side 0
-    in   osr, 1     side 0
-    out  null, 8    side 0
-    in   osr, 1     side 0
-    out  null, 32   side 0
+; Pin Assignments (Configured in C):
+; OUT pins (6): R1, G1, B1, R2, G2, B2
+; SIDE-SET pin (1): CLK
 
-public shift1:
-    pull            side 0
-    in   osr, 1     side 1
-    out  null, 8    side 1
-    in   osr, 1     side 1
-    out  null, 8    side 1
-    in   osr, 1     side 1
-    out  null, 32   side 1
-    in   null, 26   side 1
-    mov  pins, ::isr side 1
+.wrap_target
+    out pins, 6    side 0  ; Output 6 data bits, drive CLK low
+    nop            side 1  ; Drive CLK high (latch data into panel shift reg)
 .wrap
