@@ -1,11 +1,17 @@
 .program hub75
 .side_set 1
 
-; Pin Assignments (Configured in C):
-; OUT pins (6): R1, G1, B1, R2, G2, B2
-; SIDE-SET pin (1): CLK
+; PIN MAPPING:
+; OUT pins (6)  : R1, G1, B1, R2, G2, B2
+; SIDE-SET pin  : CLK
 
 .wrap_target
-    out pins, 6    side 0  ; Output 6 data bits, drive CLK low
-    nop            side 1  ; Drive CLK high (latch data into panel shift reg)
+    ; 1. Output the bottom 6 bits of data to the pins.
+    ;    Drive CLK (side-set) LOW.
+    out pins, 6    side 0
+
+    ; 2. Discard the remaining 26 bits of the 32-bit integer.
+    ;    Drive CLK (side-set) HIGH.
+    ;    This creates the rising edge needed to shift data into the panel.
+    out null, 26   side 1
 .wrap

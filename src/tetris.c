@@ -1031,6 +1031,8 @@ void game_loop() {
             //consume
             if (cur_inputs.pause && game_paused == 0) cur_inputs.pause = false;
             pause_game();
+
+            if (game_over) break;
         }
 
         if (multiplayer) {
@@ -1066,7 +1068,6 @@ void game_loop() {
     if (game_over == 2) {
         play_audio(SILENCE_SONG, false);
         cur_screen = title_screen;
-        //todo fadeout
         return;
     }
 

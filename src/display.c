@@ -227,37 +227,33 @@ void display_loop() {
 }
 
 void hub75_pio_init() {
-    // Find a free state machine
     uint offset = pio_add_program(pio_hub75, &hub75_program);
     sm_hub75 = pio_claim_unused_sm(pio_hub75, true);
     
-    // Configure PIO
     pio_sm_config c = hub75_program_get_default_config(offset);
     
-    // 1. Configure SIDESET for CLK (Pin 14)
+    // Configure Pins
     sm_config_set_sideset_pins(&c, CLK);
+    sm_config_set_out_pins(&c, DATA_BASE_PIN, 6);
+    
+    // Initialize Pins
     pio_gpio_init(pio_hub75, CLK);
     pio_sm_set_consecutive_pindirs(pio_hub75, sm_hub75, CLK, 1, true);
-
-    // 2. Configure OUT pins for Data (Base Pin 2, Count 6: R1..B2)
-    // Note: This relies on R1, G1, B1, R2, G2, B2 being contiguous starting at DATA_BASE_PIN
-    sm_config_set_out_pins(&c, DATA_BASE_PIN, 6);
     for(int i=0; i<6; i++) {
         pio_gpio_init(pio_hub75, DATA_BASE_PIN + i);
     }
     pio_sm_set_consecutive_pindirs(pio_hub75, sm_hub75, DATA_BASE_PIN, 6, true);
 
-    // 3. Setup FIFO (Auto-pull threshold 32 is fine, but we only need 6 bits per shift)
-    // We will shift out 6 bits, shift_right=true, autopull=true, pull_threshold=anything >=6
+    // FIFO Config
+    // shift_right=true (LSB first), autopull=true, threshold=32
     sm_config_set_out_shift(&c, true, true, 32); 
     
-    // 4. Set Clock Divider
-    // Target roughly 10-20MHz pixel clock. RP2350 is fast, let's divide comfortably.
-    // 150MHz / 8 = 18.75MHz. Adjust 'div' if panel flickers or glitches.
-    float div = clock_get_hz(clk_sys) / 20000000.0f; 
+    // Clock Divider
+    // Start conservative: 10MHz pixel clock (system_clock / 10MHz)
+    // If your system is 150MHz, this is div=15.
+    float div = clock_get_hz(clk_sys) / 10000000.0f; 
     sm_config_set_clkdiv(&c, div);
 
-    // Initialize and enable
     pio_sm_init(pio_hub75, sm_hub75, offset, &c);
     pio_sm_set_enabled(pio_hub75, sm_hub75, true);
 }

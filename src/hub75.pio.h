@@ -18,7 +18,7 @@
 static const uint16_t hub75_program_instructions[] = {
             //     .wrap_target
     0x6006, //  0: out    pins, 6         side 0     
-    0xb042, //  1: nop                    side 1     
+    0x707a, //  1: out    null, 26        side 1     
             //     .wrap
 };
 
