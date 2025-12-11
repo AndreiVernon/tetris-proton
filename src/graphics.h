@@ -14,8 +14,9 @@ void wait_and_push_frame();
 void get_target_framerate();
 
 void render_frame();
-void render_title();
-void draw_text(const char *s, int x, int y, bool center, uint8_t shape_id);
+void render_main_menu(int cur_sel, bool mp_wait);
+void render_options(int cur_sel);
+void draw_text(const char *s, int x, int y, int justify, uint8_t shape_id);
 void fade(int duration_ms, bool dir);
 
 #endif

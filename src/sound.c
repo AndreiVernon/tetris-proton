@@ -6,7 +6,7 @@
 #include "hardware/clocks.h"
 #include "sound.h"
 
-#define FAST_MODE true
+#define FAST_MODE false
 
 #if !FAST_MODE
 #include "title.h"
@@ -50,6 +50,7 @@ static int sfx_pos = 0;
 int song_volume = SONG_VOLUME_DEFAULT;
 int sfx_volume = SFX_VOLUME_DEFAULT;
 bool song_paused = false;
+int song_choice = THEMEA_SONG;
 
 //current audio track pointers and lengths
 static const uint8_t *curr_song = SILENCE_DATA;
@@ -70,9 +71,9 @@ static const audio_track songs[] = {
     {SILENCE_DATA, SILENCE_DATA_LENGTH},
     {THEMEA_DATA, THEMEA_DATA_LENGTH},
     #if !FAST_MODE
-    {TITLE_DATA, TITLE_DATA_LENGTH}
-    {SONGB_DATA, SONGB_DATA_LENGTH},
-    {SONGC_DATA, SONGC_DATA_LENGTH},    
+    {THEMEB_DATA, THEMEB_DATA_LENGTH},
+    {THEMEC_DATA, THEMEC_DATA_LENGTH},
+    {TITLE_DATA, TITLE_DATA_LENGTH},
     #endif
 };
 
@@ -221,6 +222,7 @@ void play_audio(int id, int is_sfx) {
         curr_sfx_len = sfx[id].length;
         sfx_pos = 0;
     } else {
+        if (FAST_MODE && id > 1) return;
         curr_song = songs[id].data;
         curr_song_len = songs[id].length;
         song_pos = 0;

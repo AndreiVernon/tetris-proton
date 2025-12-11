@@ -11,13 +11,12 @@
 #include "multiplayer.h"
 
 #define GENERATION_DELAY 0.1    //in s
-#define MP_LEVEL_TIMER 20        //how long it takes to increase level by 1 in multiplayer
+#define MP_LEVEL_TIMER_DEF 20        //how long it takes to increase level by 1 in multiplayer
 #define GRAVITY_INCREASE 0.007
 #define GRAVITY_SOFT_MULT 20    //how much soft drop multiplies gravity by
 
 #define LINES_PER_LEVEL 5
 #define FIXED_LINES_PER_LEVEL 8
-#define FIXED_LEVEL_SYSTEM true
 
 #define LOCK_DOWN_TIMER 0.5     //in s
 #define LOCK_RESET_LIMIT 15
@@ -65,6 +64,10 @@ bool multiplayer = false;
 volatile int garbage_queue = 0;   //neg is receiving, pos is sending
 
 int cur_sel = 0; //for pause menu
+
+int mp_level_timer = MP_LEVEL_TIMER_DEF;
+int start_level = 1;
+bool fixed_level_system = true;
 
 const int piece_mask_sizes[7] = {5, 2, 3, 3, 3, 3, 3};
 //from bottom left to top right
@@ -130,7 +133,7 @@ void reset_game() {
     memset(matrix, EMPTY, sizeof(matrix));
 
     score = 0;
-    level = 1;
+    level = start_level;
     total_lines_cleared = 0;
     update_gravity();
 
@@ -797,6 +800,40 @@ bool perfect_clear_check() {
     return true;
 }
 
+void calculate_level() {
+    int offset;
+
+    if (multiplayer) {
+        if (mp_level_timer >= 41) return;
+
+        if (start_level <= 1) offset = 0;
+        else offset = start_level - 1;
+
+        level = get_game_time() / 1000 / mp_level_timer + 1 + offset;
+
+    } else {
+        if (fixed_level_system) {
+            //(start_level-1)*10
+            if (start_level <= 1) offset = 0;
+            else offset = (start_level - 1) * FIXED_LINES_PER_LEVEL;
+
+            level = (total_lines_cleared + offset) / FIXED_LINES_PER_LEVEL + 1;
+        } else {
+            //5 + 10 + ... + 5*(start_level-1)
+            if (start_level <= 1) offset = 0;
+            else offset = ((start_level - 1) * (5 + 5 * (start_level - 1))) / 2;
+
+            double a = LINES_PER_LEVEL;
+            double L = (double)(total_lines_cleared + offset);
+            double n_real = (sqrt(a*a + 2.0*a*4.0*L) - a) / (2.0*a);
+            level = (int)n_real + 1;
+        }
+    }
+
+    if (level > 15) level = 15;
+    if (level < 0) level = 1;
+}
+
 void update_clear() {
     lock_piece();
 
@@ -828,18 +865,7 @@ void update_clear() {
 
     //TODO score
 
-    //update level
-    if (multiplayer) level = (get_game_time() / 1000) / MP_LEVEL_TIMER + 1;
-    else {
-        if (FIXED_LEVEL_SYSTEM) {
-            double a = LINES_PER_LEVEL;
-            double L = (double)total_lines_cleared;
-            double n_real = (sqrt(a*a + 2.0*a*4.0*L) - a) / (2.0*a);
-            level = (int)n_real + 1;
-        } else {
-            level = total_lines_cleared / FIXED_LINES_PER_LEVEL;
-        }
-    }
+    calculate_level();
 
     cur_phase = GENERATION;
 }
@@ -974,9 +1000,9 @@ void pause_game() {
             }
         }
 
-        draw_text("paused", 32, 50, true, UNSELECTED_TEXT);
-        draw_text("resume", 32, 30, true, cur_sel == 0 ? SELECTED_TEXT : UNSELECTED_TEXT);
-        draw_text("quit game", 32, 22, true, cur_sel == 1 ? SELECTED_TEXT : UNSELECTED_TEXT);
+        draw_text("paused", 32, 50, 0, UNSELECTED_TEXT);
+        draw_text("resume", 32, 30, 0, cur_sel == 0 ? SELECTED_TEXT : UNSELECTED_TEXT);
+        draw_text("quit game", 32, 22, 0, cur_sel == 1 ? SELECTED_TEXT : UNSELECTED_TEXT);
     }
 
     if (game_paused == 2) {
@@ -991,9 +1017,9 @@ void pause_game() {
             game_paused = 1;
         }
 
-        draw_text("disconnected", 32, 50, true, Z_PIECE);
-        draw_text("press up+b", 32, 30, true, UNSELECTED_TEXT);
-        draw_text("to quit", 32, 24, true, UNSELECTED_TEXT);
+        draw_text("disconnected", 32, 50, 0, Z_PIECE);
+        draw_text("press up+b", 32, 30, 0, UNSELECTED_TEXT);
+        draw_text("to quit", 32, 24, 0, UNSELECTED_TEXT);
     }
 }
 
@@ -1008,12 +1034,13 @@ void game_loop() {
     play_audio(GAME_START_SFX, true);
     sleep_ms(3200);
 
-    play_audio(THEMEA_SONG, false);
+    play_audio(song_choice, false);
 
     if (multiplayer && mp_test_en) mp_test();
 
     game_start_time = to_ms_since_boot(get_absolute_time());
 
+    mp_pause_received = 0;
     if (multiplayer) {
         mp_sync_awaiting = true;
         mp_sync_ready = true;
@@ -1052,6 +1079,7 @@ void game_loop() {
     cancel_lock_timer();
     mp_sync_awaiting = false;
     mp_sync_ready = false;
+    mp_pause_received = 0;
     song_paused = false;
     
     if (game_over == 1) {
@@ -1076,9 +1104,12 @@ void game_loop() {
 
     play_audio(SILENCE_SONG, false);
 
+    game_paused_time = to_ms_since_boot(get_absolute_time());
     render_frame();
     wait_and_push_frame();
     sleep_ms(3000);
+
+    game_start_time += to_ms_since_boot(get_absolute_time()) - game_paused_time;
     render_frame();
 
     cur_screen = title_screen;

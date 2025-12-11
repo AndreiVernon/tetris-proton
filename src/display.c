@@ -68,7 +68,7 @@ uint sm_hub75 = 0;
 uint dma_chan_hub75 = 0;
 
 void display_clear() {
-    memset(framebuffer, 0, sizeof(framebuffer));
+    memset(framebuffer[!fbf_rdy], 0, sizeof(framebuffer[0]));
 }
 
 // initialize GPIOs
@@ -85,8 +85,10 @@ void display_init() {
     gpio_put(LAT, 0);
     gpio_put(CLK, 0);
 
-    display_clear();
     fbf_rdy = 0;
+    display_clear();
+    fbf_rdy = 1;
+    display_clear();
 }
 
 //set the row address lines A..E for a half-row index [0..31]
@@ -354,11 +356,11 @@ void pio_loop() {
                     while(!pio_sm_is_tx_fifo_empty(pio_hub75, sm_hub75)) tight_loop_contents();
                     
                     // Small delay to ensure the last clock pulse finished
-                    busy_wait_at_least_cycles(50);
+                    busy_wait_at_least_cycles(30);
 
                     // --- 4. Latch & Display ---
                     gpio_put(LAT, 1);
-                    busy_wait_at_least_cycles(50); // Hold latch
+                    busy_wait_at_least_cycles(30); // Hold latch
                     gpio_put(LAT, 0);
 
                     // BCM Delay

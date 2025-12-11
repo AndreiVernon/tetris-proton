@@ -4,6 +4,7 @@
 #include <math.h>
 #include <stdlib.h>
 #include "graphics.h"
+#include "sound.h"
 #include "tetris.h"
 #include "display.h"
 #include "assets.h"
@@ -40,6 +41,7 @@ void init_frame_timer() {
 }
 
 void wait_and_push_frame() {
+    //this only made sense when i thought refresh rate was way higher than target
     // while (!frame_ready) tight_loop_contents();
     // frame_ready = false;
     
@@ -218,12 +220,13 @@ int char_to_idx(char c) {
         if (c == ':') return 36;
         if (c == '!') return 37;
         if (c == '+') return 38;
+        if (c == '<') return 39;
+        if (c == '>') return 40;
         if (c == ' ') return -2;
         return -1;
 };
 
-void draw_text(const char *s, int x, int y, bool center, uint8_t shape_id)
-{
+int get_text_width(const char *s) {
     //compute total pixel width of the string
     int total_w = 0;
     int len = 0;
@@ -242,12 +245,20 @@ void draw_text(const char *s, int x, int y, bool center, uint8_t shape_id)
     }
 
     if (len > 0) total_w += (len - 1) * LETTER_SPACING;
+    return total_w;
+}
+
+//justify: -1=left, 0=center, 1=right
+void draw_text(const char *s, int x, int y, int justify, uint8_t shape_id) {
+    //compute total pixel width of the string
+    int total_w = get_text_width(s);
 
     //determine bottom-left origin for drawing
     int origin_x = x;
     int origin_y = y;
 
-    if (center) origin_x = x - (total_w / 2);
+    if (justify == 0) origin_x = x - (total_w / 2);
+    else if (justify == 1) origin_x = x - total_w;
 
     //draw each char left-to-right
     int cursor_x = origin_x;
@@ -335,7 +346,7 @@ void fade(int duration_ms, bool dir) {
     uint8_t *orig = malloc(sizeof(framebuffer[0]));
     if (!orig) {
         display_clear();
-        draw_text("fades broke!", 32, 32, true, Z_PIECE);
+        draw_text("fades broke!", 32, 32, 0, Z_PIECE);
         sleep_ms(duration_ms);
         return;
     }
@@ -360,8 +371,8 @@ void fade(int duration_ms, bool dir) {
 
     // start_time = to_ms_since_boot(get_absolute_time());
     // while (to_ms_since_boot(get_absolute_time()) < start_time + 2000) {
-    //     memset(framebuffer[!fbf_rdy], 0, sizeof(framebuffer[0]));
-    //     draw_text(text, 20, 20, true, SELECTED_TEXT);
+    //     display_clear();
+    //     draw_text(text, 20, 20, 0, SELECTED_TEXT);
     //     wait_and_push_frame();
     // }
 
@@ -388,7 +399,7 @@ void render_frame() {
 
     //render score
     snprintf(text, sizeof(text), "%06lu", score);
-    draw_text(text, 20, 10, true, UNSELECTED_TEXT);
+    draw_text(text, 20, 10, 0, UNSELECTED_TEXT);
 
     if (multiplayer) {
     //render time
@@ -396,15 +407,86 @@ void render_frame() {
         if (!game_paused) cur_time = (to_ms_since_boot(get_absolute_time()) - game_start_time) / 1000;
         else cur_time = (game_paused_time - game_start_time) / 1000;
         snprintf(text, sizeof(text), "%02lu:%02lu", cur_time/60, cur_time%60);
-        draw_text(text, 20, 4, true, SELECTED_TEXT);
+        draw_text(text, 20, 4, 0, SELECTED_TEXT);
     } else {
         snprintf(text, sizeof(text), "Level %02lu", level);
-        draw_text(text, 20, 4, true, SELECTED_TEXT);
+        draw_text(text, 20, 4, 0, SELECTED_TEXT);
     }
 
     if (game_paused) dim_screen(0.1);
 }
 
-void render_title() {
+void render_main_menu(int cur_sel, bool mp_wait) {
+    //logo
     memcpy(framebuffer[!fbf_rdy], title_background, sizeof(framebuffer[!fbf_rdy]));
+
+    draw_text("singleplayer", 32, 23, 0, cur_sel == 0 ? SELECTED_TEXT : UNSELECTED_TEXT);
+
+    if (!mp_wait) draw_text("multiplayer", 32, 15, 0, cur_sel == 1 ? SELECTED_TEXT : UNSELECTED_TEXT);
+    else draw_text("multiplayer", 32, 15, 0, Z_PIECE);
+
+    draw_text("options", 32, 7, 0, cur_sel == 2 ? SELECTED_TEXT : UNSELECTED_TEXT);
+}
+
+void render_options(int cur_sel) {
+    //0 - song
+    //1 - starting level
+    //2 - goal (variable vs fixed)
+    //3 - mp gravity time
+    //4 - back
+
+    char text[32];
+    char text2[40];
+
+    display_clear();
+
+    draw_text("options", 32, 56, 0, UNSELECTED_TEXT);
+    //int temp = (64 - get_text_width("options")) / 2;
+    for (int x = 18; x < 46; x++) {
+        set_pixel_color(framebuffer[!fbf_rdy][56-2][x], UNSELECTED_TEXT, false);
+    }
+
+    draw_text("music:", 2, 41, -1, I_PIECE);
+    switch (song_choice) {
+        case SILENCE_SONG:
+            strcpy(text, "off");
+            break;
+        case THEMEA_SONG:
+            strcpy(text, "song a");
+            break;
+        case THEMEB_SONG:
+            strcpy(text, "song B");
+            break;
+        case THEMEC_SONG:
+            strcpy(text, "song C");
+            break;
+        default:
+            strcpy(text, "");
+            break;
+    }
+    if (cur_sel == 0) snprintf(text2, sizeof(text2), "<%s>", text);
+    else strcpy(text2, text);
+    draw_text(text2, 62, 41, 1, cur_sel == 0 ? SELECTED_TEXT : UNSELECTED_TEXT);
+
+    draw_text("start level:", 2, 34, -1, I_PIECE);
+    snprintf(text, sizeof(text), "%02d", start_level);
+    if (cur_sel == 1) snprintf(text2, sizeof(text2), "<%s>", text);
+    else strcpy(text2, text);
+    draw_text(text2, 62, 34, 1, cur_sel == 1 ? SELECTED_TEXT : UNSELECTED_TEXT);
+
+    draw_text("goal:", 2, 27, -1, I_PIECE);
+    if (fixed_level_system) strcpy(text, "variable");
+    else strcpy(text, "fixed");
+    if (cur_sel == 2) snprintf(text2, sizeof(text2), "<%s>", text);
+    else strcpy(text2, text);
+    draw_text(text2, 62, 27, 1, cur_sel == 2 ? SELECTED_TEXT : UNSELECTED_TEXT);
+
+    draw_text("grav time:", 2, 20, -1, I_PIECE);
+    if (mp_level_timer < 41) snprintf(text, sizeof(text), "%02d", mp_level_timer);
+    else strcpy(text, "off");
+    if (cur_sel == 3) snprintf(text2, sizeof(text2), "<%s>", text);
+    else strcpy(text2, text);
+    draw_text(text2, 62, 20, 1, cur_sel == 3 ? SELECTED_TEXT : UNSELECTED_TEXT);
+
+    draw_text("back", 32, 7, 0, cur_sel == 4 ? SELECTED_TEXT : UNSELECTED_TEXT);
 }

@@ -59,6 +59,10 @@ extern volatile int garbage_queue;
 extern uint32_t game_start_time;
 extern uint32_t game_paused_time;
 
+extern int mp_level_timer;
+extern int start_level;
+extern bool fixed_level_system;
+
 void game_loop();
 void init_game_blank();
 

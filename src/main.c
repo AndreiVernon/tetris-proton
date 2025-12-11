@@ -14,14 +14,14 @@ void main_menu_loop() {
     mp_sync_awaiting = false;
     mp_sync_ready = false;
 
-    render_title();
-    draw_text("singleplayer", 32, 23, true, SELECTED_TEXT);
-    draw_text("multiplayer", 32, 15, true, UNSELECTED_TEXT);
-    draw_text("options", 32, 7, true, UNSELECTED_TEXT);
-    fade(1000, 1);
-
     int cur_sel = 0;
     int NUM_OPTS = 3;
+
+    render_main_menu(cur_sel, false);
+    fade(1250, 1);
+
+    if (song_choice != SILENCE_SONG) play_audio(TITLE_SONG, false);
+
     while (1) {
         main_menu_loop_start:
         get_inputs();
@@ -40,10 +40,7 @@ void main_menu_loop() {
             break;
         }
 
-        render_title();
-        draw_text("singleplayer", 32, 23, true, cur_sel == 0 ? SELECTED_TEXT : UNSELECTED_TEXT);
-        draw_text("multiplayer", 32, 15, true, cur_sel == 1 ? SELECTED_TEXT : UNSELECTED_TEXT);
-        draw_text("options", 32, 7, true, cur_sel == 2 ? SELECTED_TEXT : UNSELECTED_TEXT);
+        render_main_menu(cur_sel, false);
         wait_and_push_frame();
     }
 
@@ -51,7 +48,6 @@ void main_menu_loop() {
         multiplayer = false;
         cur_screen = game_screen;
         play_audio(SELECT_OPTION_SFX, true);
-        play_audio(SILENCE_SONG, false);
     }
 
     if (cur_sel == 1) {
@@ -59,7 +55,7 @@ void main_menu_loop() {
         if (mp_handshake_blocking(1000)) {
             play_audio(SELECT_OPTION_SFX, true);
         } else {
-            play_audio(GARBAGE_SFX, true);
+            play_audio(PIECE_LOCK_SFX, true);
             goto main_menu_loop_start;
         }
 
@@ -80,10 +76,7 @@ void main_menu_loop() {
                 goto main_menu_loop_start;
             }
             
-            render_title();
-            draw_text("singleplayer", 32, 23, true, UNSELECTED_TEXT);
-            draw_text("multiplayer", 32, 15, true, Z_PIECE);
-            draw_text("options", 32, 7, true, UNSELECTED_TEXT);
+            render_main_menu(cur_sel, true);
             wait_and_push_frame();
         }
 
@@ -92,13 +85,98 @@ void main_menu_loop() {
         multiplayer = true;
 
         cur_screen = game_screen;
-        play_audio(SILENCE_SONG, false);
     }
 
     if (cur_sel == 2) {
         play_audio(SELECT_OPTION_SFX, true);
         cur_screen = options_screen;
     }
+
+    play_audio(SILENCE_SONG, false);
+}
+
+void options_loop() {
+    int cur_sel = 0;
+    int NUM_OPTS = 5;
+
+    //0 - song
+    //1 - starting level
+    //2 - goal (variable vs fixed)
+    //3 - mp gravity time
+    //4 - back
+    
+    render_options(cur_sel);
+    fade(250, 1);
+
+    play_audio(song_choice, false);
+
+    while (1) {
+        get_inputs();
+
+        if (cur_inputs.up) {
+            cur_sel = (cur_sel - 1 + NUM_OPTS) % NUM_OPTS;
+            play_audio(SWITCH_OPTION_SFX, true);
+        }
+
+        if (cur_inputs.down) {
+            cur_sel = (cur_sel + 1 + NUM_OPTS) % NUM_OPTS;
+            play_audio(SWITCH_OPTION_SFX, true);
+        }
+
+        //numerical adjustment
+        if (cur_inputs.left || cur_inputs.right) {
+            if (cur_sel == 1) {
+                if (cur_inputs.left && start_level > 1) {
+                    start_level--;
+                    play_audio(MOVE_SFX, true);
+                } else if (cur_inputs.right && start_level < 15) {
+                    start_level++;
+                    play_audio(MOVE_SFX, true);
+                } else {
+                    play_audio(PIECE_LOCK_SFX, true);
+                }
+            }
+
+            if (cur_sel == 3) {
+                if (cur_inputs.left && mp_level_timer > 0) {
+                    mp_level_timer--;
+                    play_audio(MOVE_SFX, true);
+                } else if (cur_inputs.right && mp_level_timer < 41) {
+                    mp_level_timer++;
+                    play_audio(MOVE_SFX, true);
+                } else {
+                    play_audio(PIECE_LOCK_SFX, true);
+                }
+                
+            }
+        }
+
+        //specific options adjustment
+        if (cur_inputs.left_edge || cur_inputs.right_edge) {
+            if (cur_sel == 0) {
+                if (cur_inputs.left_edge) song_choice = (song_choice - 1 + 4) % 4;
+                if (cur_inputs.right_edge) song_choice = (song_choice + 1 + 4) % 4;
+                play_audio(song_choice, false);
+            }
+
+            if (cur_sel == 2) {
+                fixed_level_system = !fixed_level_system;
+                play_audio(SWITCH_OPTION_SFX, true);
+            }
+        }
+
+        //go back
+        if ((cur_sel == 4 && cur_inputs.a) || cur_inputs.b || cur_inputs.start || cur_inputs.select) {
+            play_audio(SELECT_OPTION_SFX, true);
+            break;
+        }
+
+        render_options(cur_sel);
+        wait_and_push_frame();
+    }
+
+    play_audio(SILENCE_SONG, false);
+    cur_screen = title_screen;
 }
 
 int main() {
@@ -132,11 +210,11 @@ int main() {
             case game_over_screen:
                 break;
             case options_screen:
-                main_menu_loop();
+                options_loop();
                 break;
         }
 
-        fade(250, 0);
+        fade(350, 0);
     }
 
     return 0;

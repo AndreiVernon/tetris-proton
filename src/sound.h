@@ -3,7 +3,9 @@
 
 #define SILENCE_SONG 0
 #define THEMEA_SONG 1
-#define TITLE_SONG 2
+#define THEMEB_SONG 2
+#define THEMEC_SONG 3
+#define TITLE_SONG 4
 
 #define SILENCE_SFX 0
 #define CLEAR_SFX 1
@@ -27,6 +29,7 @@
 extern int song_volume;
 extern int sfx_volume;
 extern bool song_paused;
+extern int song_choice;
 
 void init_audio();
 void play_audio(int id, int is_sfx);
