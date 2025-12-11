@@ -478,8 +478,8 @@ void render_options(int cur_sel) {
     draw_text(text2, 62, 34, 1, cur_sel == 1 ? SELECTED_TEXT : UNSELECTED_TEXT);
 
     draw_text("goal:", 2, 27, -1, I_PIECE);
-    if (fixed_level_system) strcpy(text, "variable");
-    else strcpy(text, "fixed");
+    if (fixed_level_system) strcpy(text, "fixed");
+    else strcpy(text, "variable");
     if (cur_sel == 2) snprintf(text2, sizeof(text2), "<%s>", text);
     else strcpy(text2, text);
     draw_text(text2, 62, 27, 1, cur_sel == 2 ? SELECTED_TEXT : UNSELECTED_TEXT);
@@ -523,9 +523,7 @@ void render_game_over(int cur_sel, bool mp_wait, bool game_was_mp) {
     
     draw_text(text, 32, 56, 0, col);
     int temp = (64 - get_text_width(text)) / 2;
-    int tempx = temp;
-    if (temp % 2 == 1) tempx++;
-    for (int x = tempx; x < 64-temp; x++) {
+    for (int x = temp; x < 64-temp; x++) {
         set_pixel_color(framebuffer[!fbf_rdy][56-2][x], col, false);
     }
 

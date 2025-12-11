@@ -71,10 +71,9 @@ int cur_sel = 0; //for pause menu
 
 int mp_level_timer = MP_LEVEL_TIMER_DEF;
 int mp_level_timer_effective = MP_LEVEL_TIMER_DEF;
-int start_level = 1;
-int start_level_effective = 1;
+int start_level = 3;
+int start_level_effective;
 bool fixed_level_system = true;
-volatile bool in_game = false;
 
 //flag set when the active piece was rotated at least once since spawn
 bool active_piece_was_rotated = false;
@@ -1094,7 +1093,7 @@ void update_clear() {
         //if combo streak > 0 (i.e., second consecutive clear), award combo garbage and a small combo score
         if (combo_counter > 0) {
             //send combo lines to opponent
-            //if (multiplayer) lines_to_send += combo_counter;
+            if (multiplayer) lines_to_send += combo_counter;
             //add combo score: small bonus per combo (tunable)
             score += 50 * level * combo_counter;
         }
@@ -1220,8 +1219,8 @@ void mp_test() {
 }
 
 void pause_game() {
-    if (!game_paused || game_paused == 3) {
-        if (!game_paused) game_paused = 1;
+    if (game_paused == 0 || game_paused == 3) {
+        if (game_paused == 0) game_paused = 1;
         if (game_paused == 3) game_paused = 2;
 
         if (multiplayer && mp_pause_received == 0 && game_paused == 1) mp_send_msg_packed(mp_msg_pause, 0);
@@ -1275,7 +1274,7 @@ void pause_game() {
             goto pause_game_exit;
         }
 
-        if (cur_inputs.a) {        
+        if (cur_inputs.a || cur_inputs.start) {      
             if (cur_sel == 0) {
                 //consume
                 cur_inputs.a = false;
@@ -1346,21 +1345,24 @@ void game_loop() {
     level = start_level_effective;
 
     mp_pause_received = 0;
+    game_paused = 0;
     if (multiplayer) {
+        mp_drain_rx();
         mp_sync_awaiting = true;
         mp_sync_ready = true;
     }
+    mp_pause_received = 0;
 
-    in_game = true;
+    int first_time = true;
     while (game_over == 0) {
         get_inputs();
 
-        if (multiplayer && game_paused != 2 && !mp_sync_ready) {
+        if (multiplayer && game_paused != 2 && !mp_sync_ready && !first_time) {
             if (game_paused == 1) game_paused = 2;
             else game_paused = 3;
         }
 
-        if (game_paused || cur_inputs.pause || mp_pause_received != 0) {
+        if ((game_paused || cur_inputs.pause || mp_pause_received == 1) && !first_time) {
             //consume
             if (cur_inputs.pause && game_paused == 0) cur_inputs.pause = false;
             pause_game();
@@ -1377,9 +1379,14 @@ void game_loop() {
 
         if (!game_paused) render_frame();
         wait_and_push_frame();
+
+        if (first_time) {
+            game_paused = 0;
+            mp_pause_received = 0;
+        }
+        first_time = false;
     }
 
-    in_game = false;
     //game over
     cancel_generation_timer();
     cancel_gravity();

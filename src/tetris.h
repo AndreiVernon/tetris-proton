@@ -66,7 +66,6 @@ extern bool fixed_level_system;
 extern int final_time;
 extern int total_lines_cleared;
 extern int total_lines_sent, total_lines_rcvd;
-extern volatile bool in_game;
 
 void game_loop();
 void init_game_blank();

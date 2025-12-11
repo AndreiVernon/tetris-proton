@@ -103,7 +103,7 @@ static void mp_on_uart_irq() {
                 break;
 
 			case mp_msg_pause:
-				if (multiplayer && in_game && mp_sync_ready) {
+				if (multiplayer && mp_sync_ready) {
 					if (arg == 0) mp_pause_received = 1;
 					if (arg == 1) mp_pause_received = -1;
 				}

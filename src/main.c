@@ -37,7 +37,7 @@ void main_menu_loop() {
             play_audio(SWITCH_OPTION_SFX, true);
         }
 
-        if (cur_inputs.a) {
+        if (cur_inputs.a || cur_inputs.start) {
             break;
         }
 
@@ -169,7 +169,7 @@ void options_loop() {
         }
 
         //go back
-        if ((cur_sel == 4 && cur_inputs.a) || cur_inputs.b || cur_inputs.start || cur_inputs.select) {
+        if ((cur_sel == 4 && (cur_inputs.a || cur_inputs.start)) || cur_inputs.b) {
             play_audio(SELECT_OPTION_SFX, true);
             break;
         }
@@ -189,6 +189,8 @@ void game_over_loop() {
     bool game_was_mp = multiplayer;
     multiplayer = false;
 
+    uint32_t gameover_start_time = to_ms_since_boot(get_absolute_time());;
+
     //sp
     //0 retry
     //1 quit
@@ -206,6 +208,11 @@ void game_over_loop() {
         game_over_loop_start:
         get_inputs();
 
+        if (((to_ms_since_boot(get_absolute_time()) - gameover_start_time) / 1000) > 20) {
+            cur_sel = 1;
+            break;
+        }
+
         if (cur_inputs.up) {
             cur_sel = (cur_sel - 1 + NUM_OPTS) % NUM_OPTS;
             play_audio(SWITCH_OPTION_SFX, true);
@@ -216,7 +223,7 @@ void game_over_loop() {
             play_audio(SWITCH_OPTION_SFX, true);
         }
 
-        if (cur_inputs.a) {
+        if (cur_inputs.a || cur_inputs.start) {
             break;
         }
 
