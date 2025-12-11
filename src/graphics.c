@@ -253,7 +253,7 @@ int get_text_width(const char *s) {
 }
 
 //justify: -1=left, 0=center, 1=right
-void draw_text(const char *s, int x, int y, int justify, uint8_t shape_id) {
+void draw_text(const char *s, int x, int y, int justify, bool underline, bool add_arrow, uint8_t shape_id) {
     
     int total_w = get_text_width(s);
 
@@ -264,8 +264,18 @@ void draw_text(const char *s, int x, int y, int justify, uint8_t shape_id) {
     if (justify == 0) origin_x = x - (total_w / 2);
     else if (justify == 1) origin_x = x - total_w;
 
+    char arrowed_text[64];
+    if (add_arrow) {
+        origin_x -= 4;
+        snprintf(arrowed_text, sizeof(arrowed_text), ">%s", s);
+        s = arrowed_text;
+    }
+
     //draw each char left-to-right
     int cursor_x = origin_x;
+
+    int start_of_underline = cursor_x;
+    int end_of_underline = cursor_x;
 
     for (const char *p = s; *p; ++p) {
         int idx = char_to_idx(*p);
@@ -290,6 +300,8 @@ void draw_text(const char *s, int x, int y, int justify, uint8_t shape_id) {
                     if (fx < 0 || fx >= PANEL_WIDTH) continue;
 
                     set_pixel_color(framebuffer[!fbf_rdy][fy][fx], shape_id, false);
+
+                    if (end_of_underline < fx) end_of_underline = fx;
                 }
             }
         }
@@ -304,6 +316,12 @@ void draw_text(const char *s, int x, int y, int justify, uint8_t shape_id) {
             } else {
                cursor_x += LETTER_SPACING;
             }
+        }
+    }
+
+    if (underline) {
+        for (int x = start_of_underline; x <= end_of_underline; x++) {
+            set_pixel_color(framebuffer[!fbf_rdy][origin_y-2][x], shape_id, false);
         }
     }
 }
@@ -349,7 +367,6 @@ void fade(int duration_ms, bool dir) {
     uint8_t *orig = malloc(sizeof(framebuffer[0]));
     if (!orig) {
         display_clear();
-        draw_text("fades broke!", 32, 32, 0, Z_PIECE);
         sleep_ms(duration_ms);
         return;
     }
@@ -365,19 +382,6 @@ void fade(int duration_ms, bool dir) {
         dim_screen(dim_factor);
         wait_and_push_frame();
     }
-
-    // char text[32];
-    // uint32_t start_time = to_us_since_boot(get_absolute_time());
-    // wait_and_push_frame();
-    // start_time = to_us_since_boot(get_absolute_time()) - start_time;
-    // snprintf(text, sizeof(text), "%lu", start_time);
-
-    // start_time = to_ms_since_boot(get_absolute_time());
-    // while (to_ms_since_boot(get_absolute_time()) < start_time + 2000) {
-    //     display_clear();
-    //     draw_text(text, 20, 20, 0, SELECTED_TEXT);
-    //     wait_and_push_frame();
-    // }
 
     free(orig);
 }
@@ -402,7 +406,7 @@ void render_frame() {
 
     //render score
     snprintf(text, sizeof(text), "%06lu", score);
-    draw_text(text, 20, 10, 0, UNSELECTED_TEXT);
+    draw_text(text, 20, 10, 0, false, false, UNSELECTED_TEXT);
 
     if (multiplayer) {
     //render time
@@ -410,10 +414,10 @@ void render_frame() {
         if (!game_paused) cur_time = (to_ms_since_boot(get_absolute_time()) - game_start_time) / 1000;
         else cur_time = (game_paused_time - game_start_time) / 1000;
         snprintf(text, sizeof(text), "%02lu:%02lu", cur_time/60, cur_time%60);
-        draw_text(text, 20, 4, 0, SELECTED_TEXT);
+        draw_text(text, 20, 4, 0, false, false, SELECTED_TEXT);
     } else {
         snprintf(text, sizeof(text), "Level %02lu", level);
-        draw_text(text, 20, 4, 0, SELECTED_TEXT);
+        draw_text(text, 20, 4, 0, false, false, SELECTED_TEXT);
     }
 
     if (game_paused) dim_screen(0.1);
@@ -423,12 +427,12 @@ void render_main_menu(int cur_sel, bool mp_wait) {
     //logo
     memcpy(framebuffer[!fbf_rdy], title_background, sizeof(framebuffer[!fbf_rdy]));
 
-    draw_text("singleplayer", 32, 23, 0, cur_sel == 0 ? SELECTED_TEXT : UNSELECTED_TEXT);
+    draw_text("singleplayer", 32, 23, 0, false, cur_sel == 0, cur_sel == 0 ? SELECTED_TEXT : UNSELECTED_TEXT);
 
-    if (!mp_wait) draw_text("multiplayer", 32, 15, 0, cur_sel == 1 ? SELECTED_TEXT : UNSELECTED_TEXT);
-    else draw_text("multiplayer", 32, 15, 0, Z_PIECE);
+    if (!mp_wait) draw_text("multiplayer", 32, 15, 0, false, cur_sel == 1, cur_sel == 1 ? SELECTED_TEXT : UNSELECTED_TEXT);
+    else draw_text("multiplayer", 32, 15, 0, false, true, Z_PIECE);
 
-    draw_text("options", 32, 7, 0, cur_sel == 2 ? SELECTED_TEXT : UNSELECTED_TEXT);
+    draw_text("options", 32, 7, 0, false, cur_sel == 2, cur_sel == 2 ? SELECTED_TEXT : UNSELECTED_TEXT);
 }
 
 void render_options(int cur_sel) {
@@ -443,13 +447,9 @@ void render_options(int cur_sel) {
 
     display_clear();
 
-    draw_text("options", 32, 56, 0, O_PIECE);
-    //int temp = (64 - get_text_width("options")) / 2;
-    for (int x = 18; x < 46; x++) {
-        set_pixel_color(framebuffer[!fbf_rdy][56-2][x], O_PIECE, false);
-    }
+    draw_text("options", 32, 56, 0, true, false, O_PIECE);
 
-    draw_text("music:", 2, 41, -1, I_PIECE);
+    draw_text("music:", 2, 41, -1, false, false, I_PIECE);
     switch (song_choice) {
         case SILENCE_SONG:
             strcpy(text, "off");
@@ -469,29 +469,29 @@ void render_options(int cur_sel) {
     }
     if (cur_sel == 0) snprintf(text2, sizeof(text2), "<%s>", text);
     else strcpy(text2, text);
-    draw_text(text2, 62, 41, 1, cur_sel == 0 ? SELECTED_TEXT : UNSELECTED_TEXT);
+    draw_text(text2, 62, 41, 1, false, false, cur_sel == 0 ? SELECTED_TEXT : UNSELECTED_TEXT);
 
-    draw_text("start level:", 2, 34, -1, I_PIECE);
+    draw_text("start level:", 2, 34, -1, false, false, I_PIECE);
     snprintf(text, sizeof(text), "%02d", start_level);
     if (cur_sel == 1) snprintf(text2, sizeof(text2), "<%s>", text);
     else strcpy(text2, text);
-    draw_text(text2, 62, 34, 1, cur_sel == 1 ? SELECTED_TEXT : UNSELECTED_TEXT);
+    draw_text(text2, 62, 34, 1, false, false, cur_sel == 1 ? SELECTED_TEXT : UNSELECTED_TEXT);
 
-    draw_text("goal:", 2, 27, -1, I_PIECE);
+    draw_text("goal:", 2, 27, -1, false, false, I_PIECE);
     if (fixed_level_system) strcpy(text, "fixed");
     else strcpy(text, "variable");
     if (cur_sel == 2) snprintf(text2, sizeof(text2), "<%s>", text);
     else strcpy(text2, text);
-    draw_text(text2, 62, 27, 1, cur_sel == 2 ? SELECTED_TEXT : UNSELECTED_TEXT);
+    draw_text(text2, 62, 27, 1, false, false, cur_sel == 2 ? SELECTED_TEXT : UNSELECTED_TEXT);
 
-    draw_text("grav time:", 2, 20, -1, I_PIECE);
+    draw_text("grav time:", 2, 20, -1, false, false, I_PIECE);
     if (mp_level_timer > 0 && mp_level_timer < 41) snprintf(text, sizeof(text), "%02d", mp_level_timer);
     else strcpy(text, "off");
     if (cur_sel == 3) snprintf(text2, sizeof(text2), "<%s>", text);
     else strcpy(text2, text);
-    draw_text(text2, 62, 20, 1, cur_sel == 3 ? SELECTED_TEXT : UNSELECTED_TEXT);
+    draw_text(text2, 62, 20, 1, false, false, cur_sel == 3 ? SELECTED_TEXT : UNSELECTED_TEXT);
 
-    draw_text("back", 32, 7, 0, cur_sel == 4 ? SELECTED_TEXT : UNSELECTED_TEXT);
+    draw_text("back", 32, 7, 0, false, cur_sel == 4, cur_sel == 4 ? SELECTED_TEXT : UNSELECTED_TEXT);
 }
 
 void render_game_over(int cur_sel, bool mp_wait, bool game_was_mp) {
@@ -521,44 +521,52 @@ void render_game_over(int cur_sel, bool mp_wait, bool game_was_mp) {
         strcpy(text, "game over");
     }
     
-    draw_text(text, 32, 56, 0, col);
-    int temp = (64 - get_text_width(text)) / 2;
-    for (int x = temp; x < 64-temp; x++) {
-        set_pixel_color(framebuffer[!fbf_rdy][56-2][x], col, false);
-    }
+    draw_text(text, 32, 56, 0, true, false, col);
 
 
-    draw_text("score:", 5, 41, -1, I_PIECE);
+    draw_text("score:", 5, 41, -1, false, false, I_PIECE);
     snprintf(text, sizeof(text), "%06lu", score);
-    draw_text(text, 59, 41, 1, UNSELECTED_TEXT);
+    draw_text(text, 59, 41, 1, false, false, UNSELECTED_TEXT);
 
-    draw_text("time:", 5, 34, -1, I_PIECE);
+    draw_text("time:", 5, 34, -1, false, false, I_PIECE);
     snprintf(text, sizeof(text), "%02d:%02d", final_time/60, final_time%60);
-    draw_text(text, 59, 34, 1, UNSELECTED_TEXT);
+    draw_text(text, 59, 34, 1, false, false, UNSELECTED_TEXT);
 
     if (game_was_mp) {
-        draw_text("lines sent:", 5, 27, -1, I_PIECE);
+        draw_text("lines sent:", 5, 27, -1, false, false, I_PIECE);
         snprintf(text, sizeof(text), "%02d", total_lines_sent);
-        draw_text(text, 59, 27, 1, UNSELECTED_TEXT);
+        draw_text(text, 59, 27, 1, false, false, UNSELECTED_TEXT);
 
-        draw_text("lines rcvd:", 5, 20, -1, I_PIECE);
+        draw_text("lines rcvd:", 5, 20, -1, false, false, I_PIECE);
         snprintf(text, sizeof(text), "%02d", total_lines_rcvd);
-        draw_text(text, 59, 20, 1, UNSELECTED_TEXT);
+        draw_text(text, 59, 20, 1, false, false, UNSELECTED_TEXT);
     } else {
-        draw_text("lines:", 5, 27, -1, I_PIECE);
+        draw_text("lines:", 5, 27, -1, false, false, I_PIECE);
         snprintf(text, sizeof(text), "%02d", total_lines_cleared);
-        draw_text(text, 59, 27, 1, UNSELECTED_TEXT);
+        draw_text(text, 59, 27, 1, false, false, UNSELECTED_TEXT);
 
-        draw_text("level:", 5, 20, -1, I_PIECE);
+        draw_text("level:", 5, 20, -1, false, false, I_PIECE);
         snprintf(text, sizeof(text), "%02lu", level);
-        draw_text(text, 59, 20, 1, UNSELECTED_TEXT);
+        draw_text(text, 59, 20, 1, false, false, UNSELECTED_TEXT);
     }
 
     if (game_was_mp) {
-        if (!mp_wait) draw_text("rematch", 32, 10, 0, cur_sel == 0 ? SELECTED_TEXT : UNSELECTED_TEXT);
-        else draw_text("rematch", 32, 10, 0, Z_PIECE);
+        if (!mp_wait) draw_text("rematch", 32, 10, 0, false, cur_sel == 0, cur_sel == 0 ? SELECTED_TEXT : UNSELECTED_TEXT);
+        else draw_text("rematch", 32, 10, 0, false, true, Z_PIECE);
     } else {
-        draw_text("play again", 32, 10, 0, cur_sel == 0 ? SELECTED_TEXT : UNSELECTED_TEXT);
+        draw_text("play again", 32, 10, 0, false, cur_sel == 0, cur_sel == 0 ? SELECTED_TEXT : UNSELECTED_TEXT);
     }
-    draw_text("quit to title", 32, 3, 0, cur_sel == 1 ? SELECTED_TEXT : UNSELECTED_TEXT);
+    draw_text("quit to title", 32, 3, 0, false, cur_sel == 1, cur_sel == 1 ? SELECTED_TEXT : UNSELECTED_TEXT);
+}
+
+void render_pause(int cur_sel) {
+    draw_text("paused", 32, 50, 0, true, false, S_PIECE);
+    draw_text("resume", 32, 30, 0, false, cur_sel == 0, cur_sel == 0 ? SELECTED_TEXT : UNSELECTED_TEXT);
+    draw_text("quit game", 32, 22, 0, false, cur_sel == 1, cur_sel == 1 ? SELECTED_TEXT : UNSELECTED_TEXT);
+}
+
+void render_disconnected() {
+    draw_text("disconnected", 32, 50, 0, true, false, Z_PIECE);
+    draw_text("press up+b", 32, 30, 0, false, false, UNSELECTED_TEXT);
+    draw_text("to quit", 32, 24, 0, false, false, UNSELECTED_TEXT);
 }

@@ -1132,6 +1132,8 @@ void update_clear() {
 
     //perfect clear -> award 10 lines to opponent (send), not add_garbage
     if (perfect_clear_check()) {
+        lines_to_send = 10;
+
         switch (cleared) {
             case 1:
                 base_score += 800 * level;
@@ -1151,8 +1153,7 @@ void update_clear() {
     //apply calculated score and send garbage if multiplayer
     score += base_score;
 
-    if (multiplayer && perfect_clear_check() && cleared == 4) send_garbage(10);
-    else if (multiplayer && lines_to_send > 0) send_garbage(lines_to_send);
+    if (multiplayer && lines_to_send > 0) send_garbage(lines_to_send);
 
     calculate_level();
 
@@ -1239,7 +1240,6 @@ void pause_game() {
     } else {
         if (mp_pause_received == -1) {
             pause_game_exit:
-            game_paused = 0;
 
             if (multiplayer && mp_pause_received == 0) mp_send_msg_packed(mp_msg_pause, 1);
             else if (multiplayer && mp_pause_received == -1) mp_pause_received = 0;
@@ -1247,6 +1247,7 @@ void pause_game() {
             game_start_time += to_ms_since_boot(get_absolute_time()) - game_paused_time;
 
             song_paused = false;
+            game_paused = 0;
 
             return;
         }
@@ -1291,9 +1292,7 @@ void pause_game() {
             }
         }
 
-        draw_text("paused", 32, 50, 0, S_PIECE);
-        draw_text("resume", 32, 30, 0, cur_sel == 0 ? SELECTED_TEXT : UNSELECTED_TEXT);
-        draw_text("quit game", 32, 22, 0, cur_sel == 1 ? SELECTED_TEXT : UNSELECTED_TEXT);
+        render_pause(cur_sel);
     }
 
     if (game_paused == 2) {
@@ -1308,9 +1307,7 @@ void pause_game() {
             game_paused = 1;
         }
 
-        draw_text("disconnected", 32, 50, 0, Z_PIECE);
-        draw_text("press up+b", 32, 30, 0, UNSELECTED_TEXT);
-        draw_text("to quit", 32, 24, 0, UNSELECTED_TEXT);
+        render_disconnected();
     }
 }
 
@@ -1347,22 +1344,19 @@ void game_loop() {
     mp_pause_received = 0;
     game_paused = 0;
     if (multiplayer) {
-        mp_drain_rx();
         mp_sync_awaiting = true;
         mp_sync_ready = true;
     }
-    mp_pause_received = 0;
 
-    int first_time = true;
     while (game_over == 0) {
         get_inputs();
 
-        if (multiplayer && game_paused != 2 && !mp_sync_ready && !first_time) {
+        if (multiplayer && game_paused != 2 && !mp_sync_ready) {
             if (game_paused == 1) game_paused = 2;
             else game_paused = 3;
         }
 
-        if ((game_paused || cur_inputs.pause || mp_pause_received == 1) && !first_time) {
+        if (game_paused || cur_inputs.pause || mp_pause_received == 1) {
             //consume
             if (cur_inputs.pause && game_paused == 0) cur_inputs.pause = false;
             pause_game();
@@ -1371,20 +1365,17 @@ void game_loop() {
         }
 
         if (multiplayer) {
+            sleep_us(250);
             mp_sync_ready = false;
+            sleep_us(250);
             mp_send_msg_packed(mp_msg_ping, 2);
         }
 
         if (!game_paused) update_game();
 
         if (!game_paused) render_frame();
-        wait_and_push_frame();
 
-        if (first_time) {
-            game_paused = 0;
-            mp_pause_received = 0;
-        }
-        first_time = false;
+        wait_and_push_frame();
     }
 
     //game over

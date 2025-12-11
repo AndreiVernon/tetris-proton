@@ -9,6 +9,8 @@
 
 screen_t cur_screen;
 
+bool initial_boot = true;
+
 void main_menu_loop() {
     multiplayer = false;
     mp_sync_awaiting = false;
@@ -19,7 +21,10 @@ void main_menu_loop() {
     int NUM_OPTS = 3;
 
     render_main_menu(cur_sel, false);
-    fade(1250, 1);
+
+    if (initial_boot) fade(2500, 1);
+    else fade(650, 1);
+    initial_boot = false;
 
     if (song_choice != SILENCE_SONG) play_audio(TITLE_SONG, false);
 
