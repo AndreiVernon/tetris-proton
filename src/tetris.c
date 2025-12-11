@@ -81,6 +81,9 @@ bool active_piece_was_rotated = false;
 bool back_to_back_active = false;
 //combo counter: -1 means no active combo streak
 int combo_counter = -1;
+bool active_piece_last_action_was_rotate = false;
+int last_rotation_dx = 0; //last rotation wallkick delta x (post-rotation x - pre-rotation x)
+int last_rotation_dy = 0; //last rotation wallkick delta y
 
 const int piece_mask_sizes[7] = {5, 2, 3, 3, 3, 3, 3};
 //from bottom left to top right
@@ -193,7 +196,6 @@ void reset_game() {
 
     final_time = 0;
 
-    active_piece_was_rotated = false;
     back_to_back_active = false;
     combo_counter = -1;
 }
@@ -295,6 +297,8 @@ void spawn_piece(int new_shape) {
 
     active_piece.rotation = 0;
     active_piece_was_rotated = false;
+    active_piece_last_action_was_rotate = false;
+    last_rotation_dx = last_rotation_dy = 0;
 
     //I piece is 5x5
     if (active_piece.shape == I_PIECE) {
@@ -421,6 +425,9 @@ bool rotate(bool cw) {
     //if succeeded, set new rotation state
     active_piece.rotation = rotation_target;
 
+    last_rotation_dx = active_piece.x - x_old; //record kick delta x
+    last_rotation_dy = active_piece.y - y_old; //record kick delta y
+    active_piece_last_action_was_rotate = true;
     active_piece_was_rotated = true;
 
     play_audio(ROTATE_SFX, true);
@@ -473,6 +480,8 @@ void hold_piece() {
     active_piece.shape = temp;
 
     active_piece_was_rotated = false;
+    active_piece_last_action_was_rotate = false;
+    last_rotation_dx = last_rotation_dy = 0;
 }
 
 //shifts every line above `row` by amount
@@ -875,29 +884,116 @@ void calculate_level() {
 //returns 0 = not a T-Spin, 1 = mini T-Spin, 2 = full T-Spin
 int detect_tspin_from_placement(int px, int py) {
     //px,py are bottom-left of the piece in matrix coordinates
-    //center of a 3x3 piece is px+1,py+1
 
-    int cx = px + 1;
-    int cy = py + 1;
+    //rule: last maneuver must be a rotation
+    if (!active_piece_last_action_was_rotate) return 0;
 
+    int cx = px + 1; //center x
+    int cy = py + 1; //center y
+
+    //count diagonally adjacent (corners) occupied => out-of-bounds counts as occupied
     int corners = 0;
-    //corner offsets: (-1,-1),(1,-1),(-1,1),(1,1)
-    int offsets[4][2] = {{-1,-1}, {1,-1}, {-1,1}, {1,1}};
-
+    int dx_diag[4] = {-1, 1, -1, 1}; //NW,NE,SW,SE relative offsets for x
+    int dy_diag[4] = {1, 1, -1, -1};
     for (int i = 0; i < 4; i++) {
-        int x = cx + offsets[i][0];
-        int y = cy + offsets[i][1];
-
-        //out of bounds counts as occupied
+        int x = cx + dx_diag[i];
+        int y = cy + dy_diag[i];
         if (x < 0 || x >= M_WIDTH || y < 0 || y >= M_HEIGHT) {
             corners++;
-            continue;
+        } else if (matrix[y][x] != EMPTY) {
+            corners++;
         }
-        if (matrix[y][x] != EMPTY) corners++;
     }
 
-    if (corners >= 3) return 2; //full T-Spin
-    if (corners == 2) return 1; //mini T-Spin (approximation)
+    //need at least 3 occupied corners to qualify
+    if (corners < 3) return 0;
+
+    //determine the T's stem orientation by finding which orthogonal cell around center is EMPTY
+    //orth order: up(0), right(1), down(2), left(3)
+    int ox[4] = {0, 1, 0, -1};
+    int oy[4] = {1, 0, -1, 0};
+    int occupied_orth[4] = {0,0,0,0};
+    int missing_index = -1;
+    for (int i = 0; i < 4; i++) {
+        int x = cx + ox[i];
+        int y = cy + oy[i];
+        if (x < 0 || x >= M_WIDTH || y < 0 || y >= M_HEIGHT) {
+            //out of bounds treated as occupied
+            occupied_orth[i] = 1;
+        } else {
+            occupied_orth[i] = (matrix[y][x] != EMPTY) ? 1 : 0;
+        }
+        if (!occupied_orth[i] && missing_index == -1) missing_index = i;
+    }
+
+    //if we couldn't find a single missing orthogonal (external blocks may have filled it),
+    //we still can proceed: choose missing_index as the first orthogonal that is 0, otherwise -1
+    //if missing_index stays -1, fall back to treating stem as opposite of the least-occupied? but simpler: choose -1->no missing -> can't derive front/back reliably.
+    if (missing_index == -1) {
+        //we must still determine a stem; however in most valid T placements there will be exactly one missing orthogonal.
+        //conservative choice: treat as proper T-Spin (since corners >=3 and last action was rotation),
+        //but to follow rules strictly, prefer to evaluate corners pattern below without relying on missing_index.
+    }
+
+    //stem direction is opposite of missing orthogonal (if missing known)
+    int stem_dir = -1; //0=up,1=right,2=down,3=left
+    if (missing_index != -1) stem_dir = (missing_index + 2) % 4;
+
+    //compute front/back corner positions based on stem_dir:
+    //if stem up(0): front corners = NW,NE ; back = SW,SE
+    //if stem right(1): front = NE,SE ; back = NW,SW
+    //if stem down(2): front = SW,SE ; back = NW,NE
+    //if stem left(3): front = NW,SW ; back = NE,SE
+    int front1x, front1y, front2x, front2y;
+    int back1x, back1y, back2x, back2y;
+
+    if (stem_dir == 0) { //up
+        front1x = cx-1; front1y = cy+1; front2x = cx+1; front2y = cy+1;
+        back1x  = cx-1; back1y  = cy-1; back2x  = cx+1; back2y  = cy-1;
+    } else if (stem_dir == 1) { //right
+        front1x = cx+1; front1y = cy+1; front2x = cx+1; front2y = cy-1;
+        back1x  = cx-1; back1y  = cy+1; back2x  = cx-1; back2y  = cy-1;
+    } else if (stem_dir == 2) { //down
+        front1x = cx-1; front1y = cy-1; front2x = cx+1; front2y = cy-1;
+        back1x  = cx-1; back1y  = cy+1; back2x  = cx+1; back2y  = cy+1;
+    } else if (stem_dir == 3) { //left
+        front1x = cx-1; front1y = cy+1; front2x = cx-1; front2y = cy-1;
+        back1x  = cx+1; back1y  = cy+1; back2x  = cx+1; back2y  = cy-1;
+    } else {
+        //no reliable stem found; fall back to 3-corner rule only -> treat as proper T-Spin
+        return 2;
+    }
+
+    //count front/back corner occupancy (out-of-bounds counts as occupied)
+    int front_count = 0;
+    int back_count  = 0;
+
+    if (front1x < 0 || front1x >= M_WIDTH || front1y < 0 || front1y >= M_HEIGHT) front_count++;
+    else if (matrix[front1y][front1x] != EMPTY) front_count++;
+
+    if (front2x < 0 || front2x >= M_WIDTH || front2y < 0 || front2y >= M_HEIGHT) front_count++;
+    else if (matrix[front2y][front2x] != EMPTY) front_count++;
+
+    if (back1x < 0 || back1x >= M_WIDTH || back1y < 0 || back1y >= M_HEIGHT) back_count++;
+    else if (matrix[back1y][back1x] != EMPTY) back_count++;
+
+    if (back2x < 0 || back2x >= M_WIDTH || back2y < 0 || back2y >= M_HEIGHT) back_count++;
+    else if (matrix[back2y][back2x] != EMPTY) back_count++;
+
+    //apply rules:
+    //- if front_count == 2 and back_count >= 1 -> proper T-Spin
+    if (front_count == 2 && back_count >= 1) return 2;
+
+    //- else if front_count == 1 and back_count == 2 -> mini T-Spin
+    if (front_count == 1 && back_count == 2) return 1;
+
+    //- exception: if last rotation kick moved the center by a 1x2 offset, treat as proper T-spin
+    if ((abs(last_rotation_dx) == 1 && abs(last_rotation_dy) == 2) ||
+        (abs(last_rotation_dx) == 2 && abs(last_rotation_dy) == 1)) {
+        return 2;
+    }
+
+    //otherwise, even though 3 corners are occupied, it does not match the front/back pattern -> no T-Spin
     return 0;
 }
 
