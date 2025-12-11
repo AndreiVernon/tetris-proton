@@ -6,7 +6,7 @@
 #include "hardware/clocks.h"
 #include "sound.h"
 
-#define FAST_MODE true
+#define FAST_MODE false
 
 #if !FAST_MODE
 #include "themeB.h"

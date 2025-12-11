@@ -1,8 +1,8 @@
 Immediate Debug:
 
 ------
--score
--combo garbage
+X-score
+X-combo garbage
 X-levels
 X-pause menu
 X--if quit game, tell other console to quit too

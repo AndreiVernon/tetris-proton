@@ -523,35 +523,37 @@ void render_game_over(int cur_sel, bool mp_wait, bool game_was_mp) {
     
     draw_text(text, 32, 56, 0, col);
     int temp = (64 - get_text_width(text)) / 2;
-    for (int x = temp; x < temp-64; x++) {
+    int tempx = temp;
+    if (temp % 2 == 1) tempx++;
+    for (int x = tempx; x < 64-temp; x++) {
         set_pixel_color(framebuffer[!fbf_rdy][56-2][x], col, false);
     }
 
 
-    draw_text("score:", 2, 41, -1, I_PIECE);
+    draw_text("score:", 5, 41, -1, I_PIECE);
     snprintf(text, sizeof(text), "%06lu", score);
-    draw_text(text, 62, 41, 1, UNSELECTED_TEXT);
+    draw_text(text, 59, 41, 1, UNSELECTED_TEXT);
 
-    draw_text("time:", 2, 34, -1, I_PIECE);
+    draw_text("time:", 5, 34, -1, I_PIECE);
     snprintf(text, sizeof(text), "%02d:%02d", final_time/60, final_time%60);
-    draw_text(text, 62, 34, 1, UNSELECTED_TEXT);
+    draw_text(text, 59, 34, 1, UNSELECTED_TEXT);
 
     if (game_was_mp) {
-        draw_text("lines sent:", 2, 27, -1, I_PIECE);
+        draw_text("lines sent:", 5, 27, -1, I_PIECE);
         snprintf(text, sizeof(text), "%02d", total_lines_sent);
-        draw_text(text, 62, 27, 1, UNSELECTED_TEXT);
+        draw_text(text, 59, 27, 1, UNSELECTED_TEXT);
 
-        draw_text("lines rcvd:", 2, 20, -1, I_PIECE);
+        draw_text("lines rcvd:", 5, 20, -1, I_PIECE);
         snprintf(text, sizeof(text), "%02d", total_lines_rcvd);
-        draw_text(text, 62, 20, 1, UNSELECTED_TEXT);
+        draw_text(text, 59, 20, 1, UNSELECTED_TEXT);
     } else {
-        draw_text("lines:", 2, 27, -1, I_PIECE);
+        draw_text("lines:", 5, 27, -1, I_PIECE);
         snprintf(text, sizeof(text), "%02d", total_lines_cleared);
-        draw_text(text, 62, 27, 1, UNSELECTED_TEXT);
+        draw_text(text, 59, 27, 1, UNSELECTED_TEXT);
 
-        draw_text("level:", 2, 20, -1, I_PIECE);
+        draw_text("level:", 5, 20, -1, I_PIECE);
         snprintf(text, sizeof(text), "%02lu", level);
-        draw_text(text, 62, 20, 1, UNSELECTED_TEXT);
+        draw_text(text, 59, 20, 1, UNSELECTED_TEXT);
     }
 
     if (game_was_mp) {

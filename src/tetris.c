@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <math.h>
 #include <string.h>
+#include <stdlib.h>
 #include "pico/stdlib.h"
 #include "pico/rand.h"
 #include "main.h"
@@ -547,9 +548,6 @@ int check_lines() {
         }
     }
 
-    if (cleared >= 4) play_audio(CLEAR4_SFX, true);
-    else if (cleared > 0) play_audio(CLEAR_SFX, true);
-
     return cleared;
 }
 
@@ -1008,6 +1006,10 @@ void update_clear() {
     if (active_piece.shape == T_PIECE && active_piece_was_rotated) {
         tspin_type = detect_tspin_from_placement(active_piece.x, active_piece.y);
     }
+
+    if (cleared >= 4) play_audio(CLEAR4_SFX, true);
+    else if (tspin_type > 0) play_audio(SELECT_OPTION_SFX, true);
+    else if (cleared > 0) play_audio(CLEAR_SFX, true);
 
     //score and garbage calculation
     uint32_t base_score = 0;
