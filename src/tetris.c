@@ -75,6 +75,13 @@ int start_level_effective = 1;
 bool fixed_level_system = true;
 volatile bool in_game = false;
 
+//flag set when the active piece was rotated at least once since spawn
+bool active_piece_was_rotated = false;
+//back-to-back active flag
+bool back_to_back_active = false;
+//combo counter: -1 means no active combo streak
+int combo_counter = -1;
+
 const int piece_mask_sizes[7] = {5, 2, 3, 3, 3, 3, 3};
 //from bottom left to top right
 const uint8_t piece_masks[7][25] = {
@@ -185,6 +192,10 @@ void reset_game() {
     total_lines_rcvd = 0;
 
     final_time = 0;
+
+    active_piece_was_rotated = false;
+    back_to_back_active = false;
+    combo_counter = -1;
 }
 
 //check if current piece is colliding with blocks on playfield
@@ -241,9 +252,6 @@ void lock_piece() {
     }
 
     play_audio(PIECE_LOCK_SFX, true);
-
-    hold_avail = true;
-    active_piece.shape = INACTIVE;
 }
 
 //generates number between 0..max-1
@@ -286,7 +294,8 @@ void spawn_piece(int new_shape) {
     else active_piece.shape = new_shape;
 
     active_piece.rotation = 0;
-    
+    active_piece_was_rotated = false;
+
     //I piece is 5x5
     if (active_piece.shape == I_PIECE) {
         active_piece.x = 2;
@@ -301,16 +310,17 @@ void spawn_piece(int new_shape) {
         active_piece.y = 19;
         active_piece.size = 3;
     }
-    
+
     //get shape mask
     memcpy(active_piece.mask, piece_masks[active_piece.shape], active_piece.size * active_piece.size);
 
     //got to end of current bag
     if (rand_bag_loc >= 7) {
         //move second half pieces to first half
-        for (int i = 0; i < 7; i++)
+        for (int i = 0; i < 7; i++) {
             rand_bag[i] = rand_bag[i+7];
-        
+        }
+
         rand_bag_loc = 0;
         gen_rand_bag(true);
     }
@@ -411,6 +421,8 @@ bool rotate(bool cw) {
     //if succeeded, set new rotation state
     active_piece.rotation = rotation_target;
 
+    active_piece_was_rotated = true;
+
     play_audio(ROTATE_SFX, true);
     return true;
 }
@@ -459,7 +471,8 @@ void hold_piece() {
 
     //if originally held piece is INACTIVE (-1), new piece will come from bag
     active_piece.shape = temp;
-    return;
+
+    active_piece_was_rotated = false;
 }
 
 //shifts every line above `row` by amount
@@ -859,43 +872,195 @@ void calculate_level() {
     if (level < 0) level = 1;
 }
 
+//returns 0 = not a T-Spin, 1 = mini T-Spin, 2 = full T-Spin
+int detect_tspin_from_placement(int px, int py) {
+    //px,py are bottom-left of the piece in matrix coordinates
+    //center of a 3x3 piece is px+1,py+1
+
+    int cx = px + 1;
+    int cy = py + 1;
+
+    int corners = 0;
+    //corner offsets: (-1,-1),(1,-1),(-1,1),(1,1)
+    int offsets[4][2] = {{-1,-1}, {1,-1}, {-1,1}, {1,1}};
+
+    for (int i = 0; i < 4; i++) {
+        int x = cx + offsets[i][0];
+        int y = cy + offsets[i][1];
+
+        //out of bounds counts as occupied
+        if (x < 0 || x >= M_WIDTH || y < 0 || y >= M_HEIGHT) {
+            corners++;
+            continue;
+        }
+        if (matrix[y][x] != EMPTY) corners++;
+    }
+
+    if (corners >= 3) return 2; //full T-Spin
+    if (corners == 2) return 1; //mini T-Spin (approximation)
+    return 0;
+}
+
 void update_clear() {
     lock_piece();
 
     int cleared = check_lines();
     total_lines_cleared += cleared;
 
-    //perfect clear
-    if (perfect_clear_check()) {
-        if (multiplayer) add_garbage(10);
-        //TODO also add garbage of last line
-    }
-    switch (cleared) {
-        case 0:
-            if (multiplayer) add_garbage();
-            break;
-        case 1:
-            score += 100 * level;
-            // if (multiplayer) send_garbage(1);
-            break;
-        case 2:
-            score += 300 * level;
-            if (multiplayer) send_garbage(1);
-            break;
-        case 3:
-            score += 500 * level;
-            if (multiplayer) send_garbage(2);
-            break;
-        case 4:
-            score += 800 * level;
-            if (multiplayer) send_garbage(4);
-            break;
+    //determine T-Spin / Mini-T-Spin using placement and rotation flag
+    int tspin_type = 0; //0 not tspin, 1 mini, 2 full
+    if (active_piece.shape == T_PIECE && active_piece_was_rotated) {
+        tspin_type = detect_tspin_from_placement(active_piece.x, active_piece.y);
     }
 
-    //TODO score
+    //score and garbage calculation
+    uint32_t base_score = 0;
+    int lines_to_send = 0;
+    bool qualifies_for_b2b = false;
+
+    if (tspin_type > 0) {
+        //T-Spin family
+        if (tspin_type == 1) {
+            //mini t-spin
+            if (cleared == 0) {
+                base_score = 100 * level; //mini no-line
+                lines_to_send = 0;
+                //mini no-line does not start B2B and does not get B2B bonus
+                qualifies_for_b2b = false;
+            } else if (cleared == 1) {
+                base_score = 200 * level; //mini single
+                lines_to_send = 0;
+                qualifies_for_b2b = true;
+            } else if (cleared == 2) {
+                base_score = 400 * level;
+                lines_to_send = 1;
+                qualifies_for_b2b = true;
+            } else {
+                //unlikely: mini with >2 lines, treat as full t-spin line clear
+                base_score = 1600 * level;
+                lines_to_send = 6;
+                qualifies_for_b2b = true;
+            }
+        } else {
+            //full T-Spin
+            if (cleared == 0) {
+                base_score = 400 * level;
+                lines_to_send = 0;
+                qualifies_for_b2b = false;
+            } else if (cleared == 1) {
+                base_score = 800 * level;
+                lines_to_send = 2;
+                qualifies_for_b2b = true;
+            } else if (cleared == 2) {
+                base_score = 1200 * level;
+                lines_to_send = 4;
+                qualifies_for_b2b = true;
+            } else if (cleared == 3) {
+                base_score = 1600 * level;
+                lines_to_send = 6;
+                qualifies_for_b2b = true;
+            }
+        }
+    } else {
+        //not a T-Spin; handle normal line clears
+        switch (cleared) {
+            case 0:
+                //no-line clear: receiver clears incoming garbage first
+                if (multiplayer) add_garbage();
+                break;
+            case 1:
+                base_score = 100 * level;
+                lines_to_send = 0;
+                break;
+            case 2:
+                base_score = 300 * level;
+                lines_to_send = 1;
+                break;
+            case 3:
+                base_score = 500 * level;
+                lines_to_send = 2;
+                break;
+            case 4:
+                base_score = 800 * level;
+                lines_to_send = 4;
+                qualifies_for_b2b = true;
+                break;
+        }
+    }
+
+    //combo handling
+    if (cleared > 0) {
+        if (combo_counter == -1) combo_counter = 0;
+        else combo_counter++;
+
+        //if combo streak > 0 (i.e., second consecutive clear), award combo garbage and a small combo score
+        if (combo_counter > 0) {
+            //send combo lines to opponent
+            //if (multiplayer) lines_to_send += combo_counter;
+            //add combo score: small bonus per combo (tunable)
+            score += 50 * level * combo_counter;
+        }
+    } else {
+        //reset combo streak on no line clear
+        combo_counter = -1;
+    }
+
+    //back-to-back handling: if action qualifies and previous b2b active then apply bonus
+    if (qualifies_for_b2b) {
+        if (back_to_back_active) {
+            //back-to-back bonus = +50% action total
+            //we'll add base_score/2 extra (integer math)
+            uint32_t b2b_bonus = base_score / 2;
+            base_score += b2b_bonus;
+            //send +1 extra garbage for back-to-back in multiplayer
+            if (multiplayer) {
+                lines_to_send += 1;
+
+                if (tspin_type == 2 && cleared == 2) lines_to_send += 1;
+                if (tspin_type == 2 && cleared == 3) lines_to_send += 2;
+                if (cleared == 4) lines_to_send += 1;
+            }
+        }
+        //set/continue back-to-back active
+        back_to_back_active = true;
+    } else {
+        //t-spins without line clears do not break existing b2b; other actions do
+        if (tspin_type > 0 && cleared == 0) {
+            //do nothing, do not break b2b
+        } else {
+            //any non-qualifying action breaks b2b
+            back_to_back_active = false;
+        }
+    }
+
+    //perfect clear -> award 10 lines to opponent (send), not add_garbage
+    if (perfect_clear_check()) {
+        switch (cleared) {
+            case 1:
+                base_score += 800 * level;
+                break;
+            case 2:
+                base_score += 1200 * level;
+                break;
+            case 3:
+                base_score += 1800 * level;
+                break;
+            case 4:
+                base_score += 2000 * level;
+                break;
+        }
+    }
+
+    //apply calculated score and send garbage if multiplayer
+    score += base_score;
+
+    if (multiplayer && perfect_clear_check() && cleared == 4) send_garbage(10);
+    else if (multiplayer && lines_to_send > 0) send_garbage(lines_to_send);
 
     calculate_level();
 
+    hold_avail = true;
+    active_piece.shape = INACTIVE;
     cur_phase = GENERATION;
 }
 
