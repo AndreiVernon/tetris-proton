@@ -1,5 +1,5 @@
 Immediate Debug:
--mp goes red without connection
+-L and T kerning
 
 ------
 -score

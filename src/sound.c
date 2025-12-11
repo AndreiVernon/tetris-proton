@@ -6,7 +6,7 @@
 #include "hardware/clocks.h"
 #include "sound.h"
 
-#define FAST_MODE false
+#define FAST_MODE true
 
 #if !FAST_MODE
 #include "title.h"
@@ -222,7 +222,8 @@ void play_audio(int id, int is_sfx) {
         curr_sfx_len = sfx[id].length;
         sfx_pos = 0;
     } else {
-        if (FAST_MODE && id > 1) return;
+        if (FAST_MODE && id > 1) id = SILENCE_SONG;
+        
         curr_song = songs[id].data;
         curr_song_len = songs[id].length;
         song_pos = 0;

@@ -66,7 +66,9 @@ volatile int garbage_queue = 0;   //neg is receiving, pos is sending
 int cur_sel = 0; //for pause menu
 
 int mp_level_timer = MP_LEVEL_TIMER_DEF;
+int mp_level_timer_effective = MP_LEVEL_TIMER_DEF;
 int start_level = 1;
+int start_level_effective = 1;
 bool fixed_level_system = true;
 
 const int piece_mask_sizes[7] = {5, 2, 3, 3, 3, 3, 3};
@@ -171,6 +173,9 @@ void reset_game() {
     memset(&lock_timer, 0, sizeof(lock_timer));
     lock_reset_count = 0;
     lowest_height_reached = M_HEIGHT;
+
+    mp_level_timer_effective = mp_level_timer;
+    start_level_effective = start_level;
 }
 
 //check if current piece is colliding with blocks on playfield
@@ -804,24 +809,24 @@ void calculate_level() {
     int offset;
 
     if (multiplayer) {
-        if (mp_level_timer >= 41) return;
+        if (mp_level_timer_effective <= 0 || mp_level_timer_effective >= 41) return;
 
-        if (start_level <= 1) offset = 0;
-        else offset = start_level - 1;
+        if (start_level_effective <= 1) offset = 0;
+        else offset = start_level_effective - 1;
 
-        level = get_game_time() / 1000 / mp_level_timer + 1 + offset;
+        level = get_game_time() / 1000 / mp_level_timer_effective + 1 + offset;
 
     } else {
         if (fixed_level_system) {
             //(start_level-1)*10
-            if (start_level <= 1) offset = 0;
-            else offset = (start_level - 1) * FIXED_LINES_PER_LEVEL;
+            if (start_level_effective <= 1) offset = 0;
+            else offset = (start_level_effective - 1) * FIXED_LINES_PER_LEVEL;
 
             level = (total_lines_cleared + offset) / FIXED_LINES_PER_LEVEL + 1;
         } else {
             //5 + 10 + ... + 5*(start_level-1)
-            if (start_level <= 1) offset = 0;
-            else offset = ((start_level - 1) * (5 + 5 * (start_level - 1))) / 2;
+            if (start_level_effective <= 1) offset = 0;
+            else offset = ((start_level_effective - 1) * (5 + 5 * (start_level_effective - 1))) / 2;
 
             double a = LINES_PER_LEVEL;
             double L = (double)(total_lines_cleared + offset);
@@ -1000,7 +1005,7 @@ void pause_game() {
             }
         }
 
-        draw_text("paused", 32, 50, 0, UNSELECTED_TEXT);
+        draw_text("paused", 32, 50, 0, S_PIECE);
         draw_text("resume", 32, 30, 0, cur_sel == 0 ? SELECTED_TEXT : UNSELECTED_TEXT);
         draw_text("quit game", 32, 22, 0, cur_sel == 1 ? SELECTED_TEXT : UNSELECTED_TEXT);
     }
@@ -1027,9 +1032,21 @@ void game_loop() {
     play_audio(SILENCE_SONG, false);
     reset_game();
 
+    if (multiplayer) mp_drain_rx();
+
     render_frame();
     fade(250, 1);
     sleep_ms(100);
+
+    if (multiplayer) {
+        grav_opt_received = false;
+        grav_opt_temp = 0;
+
+        //send options sync
+        mp_send_msg_packed(mp_msg_level_opt, start_level);
+        mp_send_msg_packed(mp_msg_grav_opt, ((uint8_t)mp_level_timer) & 0x0F);
+        mp_send_msg_packed(mp_msg_grav_opt_hi, ((uint8_t)mp_level_timer) & 0xF0);
+    }
 
     play_audio(GAME_START_SFX, true);
     sleep_ms(3200);
@@ -1039,6 +1056,7 @@ void game_loop() {
     if (multiplayer && mp_test_en) mp_test();
 
     game_start_time = to_ms_since_boot(get_absolute_time());
+    level = start_level_effective;
 
     mp_pause_received = 0;
     if (multiplayer) {

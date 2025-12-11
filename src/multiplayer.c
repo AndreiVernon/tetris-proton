@@ -24,34 +24,13 @@
 static volatile bool awaiting_pong = false;
 static volatile bool received_pong = false;
 
+volatile bool grav_opt_received = false;
+volatile uint8_t grav_opt_temp = 0;
+
 volatile bool received_ping = false;
 volatile bool mp_sync_ready = false;
 volatile bool mp_sync_awaiting = false;
 volatile int mp_pause_received = 0; //1 = pause, -1 = unpause
-
-//encode enum to 4-bit code
-static inline uint8_t mp_encode(mp_msg_t m) {
-	switch(m) {
-		case mp_msg_ping:      return 0x01;
-		case mp_msg_pong:      return 0x02;
-		case mp_msg_send_lines:return 0x03;
-		case mp_msg_game_over: return 0x04;
-		case mp_msg_pause:	   return 0x05;
-		default:               return 0x00;
-	}
-}
-
-//decode 4-bit code to enum (unknown -> mp_msg_none)
-static inline mp_msg_t mp_decode(uint8_t code) {
-	switch(code & 0x0F) {
-		case 0x01: return mp_msg_ping;
-		case 0x02: return mp_msg_pong;
-		case 0x03: return mp_msg_send_lines;
-		case 0x04: return mp_msg_game_over;
-		case 0x05: return mp_msg_pause;
-		default:   return mp_msg_none;
-	}
-}
 
 //send a raw byte (blocking)
 static inline bool mp_send_byte(uint8_t b) {
@@ -61,19 +40,19 @@ static inline bool mp_send_byte(uint8_t b) {
 
 //send single-message (lower nibble)
 bool mp_send_msg(mp_msg_t msg) {
-	uint8_t b = mp_encode(msg) & 0x0F;
+	uint8_t b = msg & 0x0F;
 	return mp_send_byte(b);
 }
 
 //send packed: upper4=arg lower4=msg
 bool mp_send_msg_packed(mp_msg_t msg, uint8_t arg) {
-	uint8_t code = mp_encode(msg) & 0x0F;
+	uint8_t code = msg & 0x0F;
 	uint8_t b = ((arg & 0x0F) << 4) | code;
 	return mp_send_byte(b);
 }
 
 //blocking drain of UART RX (useful during startup to clear noise)
-static inline void mp_drain_rx(void) {
+void mp_drain_rx() {
 	while (uart_is_readable(UART_INST)) {
 		(void)uart_getc(UART_INST);
 	}
@@ -81,14 +60,12 @@ static inline void mp_drain_rx(void) {
 
 //internal IRQ handler
 //reads all bytes available and updates globals
-static void mp_on_uart_irq(void) {
+static void mp_on_uart_irq() {
 	//read all pending bytes
 	while (uart_is_readable(UART_INST)) {
 		uint8_t msg_byte = uart_getc(UART_INST);
 		uint8_t arg = (msg_byte >> 4) & 0x0F; //upper nibble
-		uint8_t code = msg_byte & 0x0F;       //lower nibble
-
-		mp_msg_t msg = mp_decode(code);
+		uint8_t msg = msg_byte & 0x0F;       //lower nibble
 
         switch(msg) {
             case mp_msg_ping:
@@ -128,6 +105,25 @@ static void mp_on_uart_irq(void) {
 			case mp_msg_pause:
 				if (arg == 0) mp_pause_received = 1;
 				if (arg == 1) mp_pause_received = -1;
+				break;
+
+			case mp_msg_level_opt:
+				if (multiplayer) {
+					if (arg < start_level) start_level_effective = arg;
+				}
+				break;
+			
+			case mp_msg_grav_opt:
+			case mp_msg_grav_opt_hi:
+				if (!multiplayer) break;
+				if (msg == mp_msg_grav_opt) grav_opt_temp |= arg;
+				if (msg == mp_msg_grav_opt_hi) grav_opt_temp |= arg << 4;
+
+				if (grav_opt_received) {
+					if (arg > mp_level_timer) mp_level_timer_effective = arg;
+				} else {
+					grav_opt_received = true;
+				}
 				break;
 
             default:               

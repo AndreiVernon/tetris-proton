@@ -226,31 +226,35 @@ int char_to_idx(char c) {
         return -1;
 };
 
+//compute total pixel width of text
 int get_text_width(const char *s) {
-    //compute total pixel width of the string
     int total_w = 0;
-    int len = 0;
-    for (const char *p = s; *p; ++p) {
+    const char *p = s;
+
+    while (*p) {
+        int w = 0;
         int idx = char_to_idx(*p);
-        if (idx >= 0) {
-            total_w += font_widths[idx];
-            ++len;
-        } else if (idx == -2) {
-            total_w += SPACE_WIDTH;
-            ++len;
-        } else {
-            total_w += 1; //unknown char == 1 blank column
-            ++len;
+
+        if (idx >= 0) w = font_widths[idx];
+        else if (idx == -2) w = SPACE_WIDTH; //space
+        else w = 1; //unknown
+
+        total_w += w;
+
+        if (*(p + 1)) {
+            if (!(*p == 'L' && *(p + 1) == 'T'))
+                total_w += LETTER_SPACING;
         }
+
+        p++;
     }
 
-    if (len > 0) total_w += (len - 1) * LETTER_SPACING;
     return total_w;
 }
 
 //justify: -1=left, 0=center, 1=right
 void draw_text(const char *s, int x, int y, int justify, uint8_t shape_id) {
-    //compute total pixel width of the string
+    
     int total_w = get_text_width(s);
 
     //determine bottom-left origin for drawing
@@ -265,43 +269,42 @@ void draw_text(const char *s, int x, int y, int justify, uint8_t shape_id) {
 
     for (const char *p = s; *p; ++p) {
         int idx = char_to_idx(*p);
+        int w = 0;
 
-        //space
-        if (idx == -2) {
-            cursor_x += SPACE_WIDTH;
-            cursor_x += LETTER_SPACING;
-            continue;
-        }
+        //get width
+        if (idx == -2) w = SPACE_WIDTH;
+        else if (idx == -1) w = 1;
 
-        //unknown char
-        if (idx == -1) {
-            cursor_x += 1;
-            cursor_x += LETTER_SPACING;
-            continue;
-        }
+        else {
+            w = font_widths[idx];
+            
+            //only draw pixels if it's a valid font character
+            for (int row = 0; row < FONT_HEIGHT; ++row) {
+                int fy = origin_y + row;
+                if (fy < 0 || fy >= PANEL_HEIGHT) continue;
 
-        int w = font_widths[idx];
+                for (int col = 0; col < w; ++col) {
+                    if (!font_mask[idx][row][col]) continue;
 
-        //draw font
-        for (int row = 0; row < FONT_HEIGHT; ++row) {
-            int fy = origin_y + row;
+                    int fx = cursor_x + col;
+                    if (fx < 0 || fx >= PANEL_WIDTH) continue;
 
-            if (fy < 0 || fy >= PANEL_HEIGHT) continue;
-
-            for (int col = 0; col < w; ++col) {
-                if (!font_mask[idx][row][col]) continue;
-
-                int fx = cursor_x + col;
-
-                if (fx < 0 || fx >= PANEL_WIDTH) continue;
-
-                set_pixel_color(framebuffer[!fbf_rdy][fy][fx], shape_id, false);
+                    set_pixel_color(framebuffer[!fbf_rdy][fy][fx], shape_id, false);
+                }
             }
         }
 
         //advance cursor
         cursor_x += w;
-        cursor_x += LETTER_SPACING;
+
+        //kerning
+        if (*(p + 1)) {
+            if (*p == 'L' && *(p + 1) == 'T') {
+               //if L followed by T, don't add spacing
+            } else {
+               cursor_x += LETTER_SPACING;
+            }
+        }
     }
 }
 
@@ -440,10 +443,10 @@ void render_options(int cur_sel) {
 
     display_clear();
 
-    draw_text("options", 32, 56, 0, UNSELECTED_TEXT);
+    draw_text("options", 32, 56, 0, O_PIECE);
     //int temp = (64 - get_text_width("options")) / 2;
     for (int x = 18; x < 46; x++) {
-        set_pixel_color(framebuffer[!fbf_rdy][56-2][x], UNSELECTED_TEXT, false);
+        set_pixel_color(framebuffer[!fbf_rdy][56-2][x], O_PIECE, false);
     }
 
     draw_text("music:", 2, 41, -1, I_PIECE);
@@ -482,7 +485,7 @@ void render_options(int cur_sel) {
     draw_text(text2, 62, 27, 1, cur_sel == 2 ? SELECTED_TEXT : UNSELECTED_TEXT);
 
     draw_text("grav time:", 2, 20, -1, I_PIECE);
-    if (mp_level_timer < 41) snprintf(text, sizeof(text), "%02d", mp_level_timer);
+    if (mp_level_timer > 0 && mp_level_timer < 41) snprintf(text, sizeof(text), "%02d", mp_level_timer);
     else strcpy(text, "off");
     if (cur_sel == 3) snprintf(text2, sizeof(text2), "<%s>", text);
     else strcpy(text2, text);

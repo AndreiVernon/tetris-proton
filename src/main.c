@@ -13,6 +13,7 @@ void main_menu_loop() {
     multiplayer = false;
     mp_sync_awaiting = false;
     mp_sync_ready = false;
+    mp_drain_rx();
 
     int cur_sel = 0;
     int NUM_OPTS = 3;
@@ -51,6 +52,8 @@ void main_menu_loop() {
     }
 
     if (cur_sel == 1) {
+        mp_drain_rx();
+        
         //detect other console
         if (mp_handshake_blocking(1000)) {
             play_audio(SELECT_OPTION_SFX, true);
@@ -138,7 +141,7 @@ void options_loop() {
             }
 
             if (cur_sel == 3) {
-                if (cur_inputs.left && mp_level_timer > 0) {
+                if (cur_inputs.left && mp_level_timer > 1) {
                     mp_level_timer--;
                     play_audio(MOVE_SFX, true);
                 } else if (cur_inputs.right && mp_level_timer < 41) {
