@@ -299,7 +299,7 @@ void draw_text(const char *s, int x, int y, int justify, uint8_t shape_id) {
 
         //kerning
         if (*(p + 1)) {
-            if (*p == 'L' && *(p + 1) == 'T') {
+            if ((*p == 'L' || *p == 'l') && (*(p + 1) == 'T' | *(p + 1) == 't')) {
                //if L followed by T, don't add spacing
             } else {
                cursor_x += LETTER_SPACING;
