@@ -1,5 +1,4 @@
 Immediate Debug:
--L and T kerning
 
 ------
 -score
@@ -8,7 +7,7 @@ X-levels
 X-pause menu
 X--if quit game, tell other console to quit too
 X-options menu
--game over menu
+X-game over menu
 X-fade between screens
 X--fadeout in main.c then fadein at beginning of each loop
 X-multiplayer combined audio

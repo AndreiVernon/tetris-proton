@@ -63,6 +63,11 @@ extern int mp_level_timer, mp_level_timer_effective;
 extern int start_level, start_level_effective;
 extern bool fixed_level_system;
 
+extern int final_time;
+extern int total_lines_cleared;
+extern int total_lines_sent, total_lines_rcvd;
+extern volatile bool in_game;
+
 void game_loop();
 void init_game_blank();
 

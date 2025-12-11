@@ -299,8 +299,8 @@ void draw_text(const char *s, int x, int y, int justify, uint8_t shape_id) {
 
         //kerning
         if (*(p + 1)) {
-            if ((*p == 'L' || *p == 'l') && (*(p + 1) == 'T' | *(p + 1) == 't')) {
-               //if L followed by T, don't add spacing
+            if ((*p == 'L' || *p == 'l') && (*(p + 1) == 'T' || *(p + 1) == 't')) {
+               //if L next to T, don't add spacing
             } else {
                cursor_x += LETTER_SPACING;
             }
@@ -492,4 +492,73 @@ void render_options(int cur_sel) {
     draw_text(text2, 62, 20, 1, cur_sel == 3 ? SELECTED_TEXT : UNSELECTED_TEXT);
 
     draw_text("back", 32, 7, 0, cur_sel == 4 ? SELECTED_TEXT : UNSELECTED_TEXT);
+}
+
+void render_game_over(int cur_sel, bool mp_wait, bool game_was_mp) {
+    //0 - song
+    //1 - starting level
+    //2 - goal (variable vs fixed)
+    //3 - mp gravity time
+    //4 - back
+
+    char text[32];
+
+    display_clear();
+
+    int col;
+    if (game_was_mp) {
+        if (game_over == 1) {
+            col = Z_PIECE;
+            strcpy(text, "you lose!");
+        }
+
+        if (game_over == -1) {
+            col = S_PIECE;
+            strcpy(text, "you win!");
+        }
+    } else {
+        col = Z_PIECE;
+        strcpy(text, "game over");
+    }
+    
+    draw_text(text, 32, 56, 0, col);
+    int temp = (64 - get_text_width(text)) / 2;
+    for (int x = temp; x < temp-64; x++) {
+        set_pixel_color(framebuffer[!fbf_rdy][56-2][x], col, false);
+    }
+
+
+    draw_text("score:", 2, 41, -1, I_PIECE);
+    snprintf(text, sizeof(text), "%06lu", score);
+    draw_text(text, 62, 41, 1, UNSELECTED_TEXT);
+
+    draw_text("time:", 2, 34, -1, I_PIECE);
+    snprintf(text, sizeof(text), "%02d:%02d", final_time/60, final_time%60);
+    draw_text(text, 62, 34, 1, UNSELECTED_TEXT);
+
+    if (game_was_mp) {
+        draw_text("lines sent:", 2, 27, -1, I_PIECE);
+        snprintf(text, sizeof(text), "%02d", total_lines_sent);
+        draw_text(text, 62, 27, 1, UNSELECTED_TEXT);
+
+        draw_text("lines rcvd:", 2, 20, -1, I_PIECE);
+        snprintf(text, sizeof(text), "%02d", total_lines_rcvd);
+        draw_text(text, 62, 20, 1, UNSELECTED_TEXT);
+    } else {
+        draw_text("lines:", 2, 27, -1, I_PIECE);
+        snprintf(text, sizeof(text), "%02d", total_lines_cleared);
+        draw_text(text, 62, 27, 1, UNSELECTED_TEXT);
+
+        draw_text("level:", 2, 20, -1, I_PIECE);
+        snprintf(text, sizeof(text), "%02lu", level);
+        draw_text(text, 62, 20, 1, UNSELECTED_TEXT);
+    }
+
+    if (game_was_mp) {
+        if (!mp_wait) draw_text("rematch", 32, 10, 0, cur_sel == 0 ? SELECTED_TEXT : UNSELECTED_TEXT);
+        else draw_text("rematch", 32, 10, 0, Z_PIECE);
+    } else {
+        draw_text("play again", 32, 10, 0, cur_sel == 0 ? SELECTED_TEXT : UNSELECTED_TEXT);
+    }
+    draw_text("quit to title", 32, 3, 0, cur_sel == 1 ? SELECTED_TEXT : UNSELECTED_TEXT);
 }

@@ -6,6 +6,7 @@
 #define THEMEB_SONG 2
 #define THEMEC_SONG 3
 #define TITLE_SONG 4
+#define ENDING_SONG 5
 
 #define SILENCE_SFX 0
 #define CLEAR_SFX 1

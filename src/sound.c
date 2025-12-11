@@ -9,9 +9,10 @@
 #define FAST_MODE true
 
 #if !FAST_MODE
-#include "title.h"
 #include "themeB.h"
 #include "themeC.h"
+#include "title.h"
+#include "ending.h"
 #endif
 
 #include "silence.h"
@@ -74,6 +75,7 @@ static const audio_track songs[] = {
     {THEMEB_DATA, THEMEB_DATA_LENGTH},
     {THEMEC_DATA, THEMEC_DATA_LENGTH},
     {TITLE_DATA, TITLE_DATA_LENGTH},
+    {ENDING_DATA, ENDING_DATA_LENGTH},
     #endif
 };
 
@@ -223,7 +225,7 @@ void play_audio(int id, int is_sfx) {
         sfx_pos = 0;
     } else {
         if (FAST_MODE && id > 1) id = SILENCE_SONG;
-        
+
         curr_song = songs[id].data;
         curr_song_len = songs[id].length;
         song_pos = 0;

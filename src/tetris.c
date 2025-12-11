@@ -25,7 +25,9 @@ uint8_t matrix[M_HEIGHT][M_WIDTH] = {0};
 
 uint32_t score = 0;
 uint32_t level = 1;
-uint32_t total_lines_cleared = 0;
+int total_lines_cleared = 0;
+int total_lines_sent = 0;
+int total_lines_rcvd = 0;
 double gravity = 1; //secs to fall one row
 volatile int game_over = 0; //1 = lose, -1 = win, 2 = quit
 
@@ -45,6 +47,7 @@ int game_paused = 0; //1 = pause, 2 = mp connection lost, 3 = mp connection just
 
 uint32_t game_start_time;   //in ms
 uint32_t game_paused_time;  //in ms
+int final_time; //in s
 
 int generation_timer_flag = -1;     //-1 = not armed, 0 = armed, 1 = fired
 repeating_timer_t generation_timer = {0};
@@ -70,6 +73,7 @@ int mp_level_timer_effective = MP_LEVEL_TIMER_DEF;
 int start_level = 1;
 int start_level_effective = 1;
 bool fixed_level_system = true;
+volatile bool in_game = false;
 
 const int piece_mask_sizes[7] = {5, 2, 3, 3, 3, 3, 3};
 //from bottom left to top right
@@ -176,6 +180,11 @@ void reset_game() {
 
     mp_level_timer_effective = mp_level_timer;
     start_level_effective = start_level;
+
+    total_lines_sent = 0;
+    total_lines_rcvd = 0;
+
+    final_time = 0;
 }
 
 //check if current piece is colliding with blocks on playfield
@@ -424,6 +433,11 @@ void hard_drop(bool ghost) {
     while (!is_colliding(ghost)) piece_sel->y--;
 
     if (temp != piece_sel->y) piece_sel->y++;
+    
+    if (!ghost) {
+        int score_add = 2 * (temp - piece_sel->y);
+        if (score_add > 0) score += score_add;
+    }
 }
 
 //update ghost piece
@@ -552,6 +566,8 @@ void add_garbage() {
     int gap_x = get_rand_32_uniform_scaled(M_WIDTH);
 
     while (garbage_queue < 0) {
+        total_lines_rcvd++;
+
         shift_lines(0, 1);
 
         //create garbage blocks
@@ -575,6 +591,7 @@ void send_garbage(int amount) {
     if (garbage_queue <= 0) return;
 
     mp_send_msg_packed(mp_msg_send_lines, garbage_queue);
+    total_lines_sent += garbage_queue;
     garbage_queue = 0;
 }
 
@@ -625,7 +642,10 @@ bool gravity_cb(repeating_timer_t *rt) {
     int *flag = (int *) rt->user_data;
     *flag += 1; //fired
 
-    if (gravity_timer_flag == 1) play_audio(SOFT_DROP_SFX, true);
+    if (gravity_timer_flag == 1) {
+        play_audio(SOFT_DROP_SFX, true);
+        score++;
+    }
 
     //repeating
     return true;
@@ -855,15 +875,19 @@ void update_clear() {
             if (multiplayer) add_garbage();
             break;
         case 1:
+            score += 100 * level;
             // if (multiplayer) send_garbage(1);
             break;
         case 2:
+            score += 300 * level;
             if (multiplayer) send_garbage(1);
             break;
         case 3:
+            score += 500 * level;
             if (multiplayer) send_garbage(2);
             break;
         case 4:
+            score += 800 * level;
             if (multiplayer) send_garbage(4);
             break;
     }
@@ -1064,6 +1088,7 @@ void game_loop() {
         mp_sync_ready = true;
     }
 
+    in_game = true;
     while (game_over == 0) {
         get_inputs();
 
@@ -1091,6 +1116,7 @@ void game_loop() {
         wait_and_push_frame();
     }
 
+    in_game = false;
     //game over
     cancel_generation_timer();
     cancel_gravity();
@@ -1099,6 +1125,8 @@ void game_loop() {
     mp_sync_ready = false;
     mp_pause_received = 0;
     song_paused = false;
+
+    final_time = (to_ms_since_boot(get_absolute_time()) - game_start_time) / 1000;
     
     if (game_over == 1) {
         if (multiplayer) mp_send_msg(mp_msg_game_over);
@@ -1125,10 +1153,10 @@ void game_loop() {
     game_paused_time = to_ms_since_boot(get_absolute_time());
     render_frame();
     wait_and_push_frame();
-    sleep_ms(3000);
+    sleep_ms(1500);
 
     game_start_time += to_ms_since_boot(get_absolute_time()) - game_paused_time;
     render_frame();
 
-    cur_screen = title_screen;
+    cur_screen = game_over_screen;
 }

@@ -16,6 +16,7 @@ void get_target_framerate();
 void render_frame();
 void render_main_menu(int cur_sel, bool mp_wait);
 void render_options(int cur_sel);
+void render_game_over(int cur_sel, bool mp_wait, bool game_was_mp);
 void draw_text(const char *s, int x, int y, int justify, uint8_t shape_id);
 void fade(int duration_ms, bool dir);
 

@@ -53,7 +53,7 @@ void main_menu_loop() {
 
     if (cur_sel == 1) {
         mp_drain_rx();
-        
+
         //detect other console
         if (mp_handshake_blocking(1000)) {
             play_audio(SELECT_OPTION_SFX, true);
@@ -75,7 +75,7 @@ void main_menu_loop() {
 
             if (cur_inputs.b) {
                 mp_sync_awaiting = false;
-                multiplayer = false;
+                play_audio(PIECE_LOCK_SFX, true);
                 goto main_menu_loop_start;
             }
             
@@ -182,6 +182,100 @@ void options_loop() {
     cur_screen = title_screen;
 }
 
+void game_over_loop() {
+    int cur_sel = 0;
+    int NUM_OPTS = 2;
+
+    bool game_was_mp = multiplayer;
+    multiplayer = false;
+
+    //sp
+    //0 retry
+    //1 quit
+
+    //mp
+    //0 rematch
+    //1 quit
+    
+    render_game_over(cur_sel, false, game_was_mp);
+    fade(250, 1);
+
+    if (song_choice != SILENCE_SONG) play_audio(ENDING_SONG, false);
+
+    while (1) {
+        game_over_loop_start:
+        get_inputs();
+
+        if (cur_inputs.up) {
+            cur_sel = (cur_sel - 1 + NUM_OPTS) % NUM_OPTS;
+            play_audio(SWITCH_OPTION_SFX, true);
+        }
+
+        if (cur_inputs.down) {
+            cur_sel = (cur_sel + 1 + NUM_OPTS) % NUM_OPTS;
+            play_audio(SWITCH_OPTION_SFX, true);
+        }
+
+        if (cur_inputs.a) {
+            break;
+        }
+
+        render_game_over(cur_sel, false, game_was_mp);
+        wait_and_push_frame();
+    }
+
+    if (cur_sel == 1) {
+        cur_screen = title_screen;
+        play_audio(SELECT_OPTION_SFX, true);
+    }
+
+    if (!game_was_mp && cur_sel == 0) {
+        cur_screen = game_screen;
+        play_audio(SELECT_OPTION_SFX, true);
+    }
+
+    if (game_was_mp && cur_sel == 0) {
+        mp_drain_rx();
+
+        //detect other console
+        if (mp_handshake_blocking(1000)) {
+            play_audio(SELECT_OPTION_SFX, true);
+        } else {
+            play_audio(PIECE_LOCK_SFX, true);
+            goto game_over_loop_start;
+        }
+
+        mp_sync_ready = false;
+        mp_sync_awaiting = true;
+        mp_send_msg_packed(mp_msg_ping, 2);
+        sleep_ms(1);
+
+        //sync with other console
+        while (!mp_sync_ready) {
+            mp_send_msg_packed(mp_msg_ping, 2);
+
+            get_inputs();
+
+            if (cur_inputs.b) {
+                mp_sync_awaiting = false;
+                play_audio(PIECE_LOCK_SFX, true);
+                goto game_over_loop_start;
+            }
+            
+            render_game_over(cur_sel, true, game_was_mp);
+            wait_and_push_frame();
+        }
+
+        mp_sync_awaiting = false;
+        mp_sync_ready = false;
+        multiplayer = true;
+
+        cur_screen = game_screen;
+    }
+
+    play_audio(SILENCE_SONG, false);
+}
+
 int main() {
     stdio_init_all();
 
@@ -211,6 +305,7 @@ int main() {
                 game_loop();
                 break;
             case game_over_screen:
+                game_over_loop();
                 break;
             case options_screen:
                 options_loop();
