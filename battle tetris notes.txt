@@ -96,3 +96,33 @@ davis:
 tetris logo: 
 stalk about 1.25x wider than sides
 top bar 1.25x taller than stalk
+
+
+-----------------------------------------------
+mp conn detect:
+
+states:
+unpaused -> paused
+-pause init routine
+
+unpaused -> disconnected
+-pause init routine
+
+paused <-> disconnected
+-no pause init routine
+
+
+what can cause a pause:
+-you hit pause
+--if mp pause other player too
+
+-other player hit pause
+
+-disconnected
+
+
+what can cause an unpause:
+-you hit unpause
+--if mp unpause other player too
+
+-other player hit unpause

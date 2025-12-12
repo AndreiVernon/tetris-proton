@@ -5,11 +5,11 @@
 
 typedef enum {
     mp_msg_none        = 0x00,
-	mp_msg_ping        = 0x01,
+	mp_msg_ping        = 0x01, //0 = generic, 2 = sync, 3 = game connection
 	mp_msg_pong        = 0x02,
 	mp_msg_send_lines  = 0x03,
-	mp_msg_game_over   = 0x04,
-	mp_msg_pause       = 0x05,
+	mp_msg_game_over   = 0x04, //0 = win/lose, 2 = quit
+	mp_msg_pause       = 0x05, //0 = pause, 1 = unpause
 	mp_msg_level_opt   = 0x06,
 	mp_msg_grav_opt    = 0x07,
 	mp_msg_grav_opt_hi = 0x08,
@@ -21,6 +21,7 @@ extern volatile bool mp_sync_awaiting;
 extern volatile int mp_pause_received;
 extern volatile bool grav_opt_received;
 extern volatile uint8_t grav_opt_temp;
+extern volatile bool mp_game_conn_received;
 
 void mp_uart_init();
 bool mp_send_msg(mp_msg_t msg);

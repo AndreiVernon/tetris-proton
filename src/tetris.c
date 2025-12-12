@@ -44,7 +44,7 @@ int rand_bag_loc = 0;           //index of bag
 GamePhase cur_phase = GENERATION;
 
 int frame_timer;
-int game_paused = 0; //1 = pause, 2 = mp connection lost, 3 = mp connection just lost
+bool game_paused = false; //1 = pause, 2 = mp connection lost, 3 = mp connection just lost
 
 uint32_t game_start_time;   //in ms
 uint32_t game_paused_time;  //in ms
@@ -84,6 +84,9 @@ int combo_counter = -1;
 bool active_piece_last_action_was_rotate = false;
 int last_rotation_dx = 0; //last rotation wallkick delta x (post-rotation x - pre-rotation x)
 int last_rotation_dy = 0; //last rotation wallkick delta y
+
+volatile bool in_game = false;
+int game_connected = true;
 
 const int piece_mask_sizes[7] = {5, 2, 3, 3, 3, 3, 3};
 //from bottom left to top right
@@ -154,7 +157,7 @@ void reset_game() {
     update_gravity();
 
     game_over = 0;
-    game_paused = 0;
+    game_paused = false;
     game_start_time = to_ms_since_boot(get_absolute_time());
 
     garbage_queue = 0;
@@ -198,6 +201,8 @@ void reset_game() {
 
     back_to_back_active = false;
     combo_counter = -1;
+
+    mp_pause_received = 0;
 }
 
 //check if current piece is colliding with blocks on playfield
@@ -1007,7 +1012,7 @@ void update_clear() {
     }
 
     if (cleared >= 4) play_audio(CLEAR4_SFX, true);
-    else if (tspin_type > 0) play_audio(SELECT_OPTION_SFX, true);
+    else if (tspin_type > 0 && cleared > 0) play_audio(SELECT_OPTION_SFX, true);
     else if (cleared > 0) play_audio(CLEAR_SFX, true);
 
     //score and garbage calculation
@@ -1220,12 +1225,16 @@ void mp_test() {
 }
 
 void pause_game() {
-    if (game_paused == 0 || game_paused == 3) {
-        if (game_paused == 0) game_paused = 1;
-        if (game_paused == 3) game_paused = 2;
+    //pause init
+    if (!game_paused) {
+        game_paused = true;
 
-        if (multiplayer && mp_pause_received == 0 && game_paused == 1) mp_send_msg_packed(mp_msg_pause, 0);
-        else if (multiplayer && mp_pause_received == 1 && game_paused == 1) mp_pause_received = 0;
+        cur_inputs.pause = false;
+
+        if (multiplayer) {
+            if (mp_pause_received == 0) mp_send_msg_packed(mp_msg_pause, 0);
+            mp_pause_received = 0;
+        }
 
         game_paused_time = to_ms_since_boot(get_absolute_time());
 
@@ -1237,25 +1246,11 @@ void pause_game() {
         cancel_lock_timer();
 
         cur_sel = 0;
-    } else {
-        if (mp_pause_received == -1) {
-            pause_game_exit:
-
-            if (multiplayer && mp_pause_received == 0) mp_send_msg_packed(mp_msg_pause, 1);
-            else if (multiplayer && mp_pause_received == -1) mp_pause_received = 0;
-
-            game_start_time += to_ms_since_boot(get_absolute_time()) - game_paused_time;
-
-            song_paused = false;
-            game_paused = 0;
-
-            return;
-        }
     }
 
     render_frame();
 
-    if (game_paused == 1) {
+    if (game_connected) {
         int NUM_OPTS = 2;
         if (cur_inputs.up) {
             cur_sel = (cur_sel - 1 + NUM_OPTS) % NUM_OPTS;
@@ -1272,39 +1267,39 @@ void pause_game() {
             cur_inputs.pause = false;
             cur_inputs.rot_left = false;
             cur_inputs.b = false;
-            goto pause_game_exit;
+            game_paused = false;
         }
 
-        if (cur_inputs.a || cur_inputs.start) {      
+        if (cur_inputs.a) {      
             if (cur_sel == 0) {
                 //consume
                 cur_inputs.a = false;
                 cur_inputs.rot_right = false;
-                goto pause_game_exit;
+                game_paused = false;
             }
 
             if (cur_sel == 1) {
                 play_audio(SELECT_OPTION_SFX, true);
-                //todo fadeout
                 if (multiplayer) mp_send_msg_packed(mp_msg_game_over, 2);
                 game_over = 2;
-                goto pause_game_exit;
+                game_paused = false;
             }
+        }
+
+        if (multiplayer && mp_pause_received == -1) {
+            game_paused = false;
         }
 
         render_pause(cur_sel);
     }
 
-    if (game_paused == 2) {
+    if (!game_connected) {
+        cur_sel = 0;
+
         if (raw_inputs.up && raw_inputs.b) {
             play_audio(SELECT_OPTION_SFX, true);
-            //todo fadeout
             if (multiplayer) mp_send_msg_packed(mp_msg_game_over, 2);
             game_over = 2;
-        }
-
-        if (mp_sync_ready) {
-            game_paused = 1;
         }
 
         render_disconnected();
@@ -1341,34 +1336,55 @@ void game_loop() {
     game_start_time = to_ms_since_boot(get_absolute_time());
     level = start_level_effective;
 
-    mp_pause_received = 0;
-    game_paused = 0;
+    game_connected = true;
     if (multiplayer) {
-        mp_sync_awaiting = true;
-        mp_sync_ready = true;
+        mp_game_conn_received = true;
     }
+
+    int cur_frame_in_sec = 0;
+    in_game = true;
 
     while (game_over == 0) {
         get_inputs();
 
-        if (multiplayer && game_paused != 2 && !mp_sync_ready) {
-            if (game_paused == 1) game_paused = 2;
-            else game_paused = 3;
+        //game connection check
+        if (multiplayer) {
+            if (game_connected) {
+                if (cur_frame_in_sec == 0) {
+                    game_connected = mp_game_conn_received;
+                    mp_game_conn_received = false;
+
+                } else if (cur_frame_in_sec == TARGET_FRAMERATE / 4) {
+                    mp_send_msg_packed(mp_msg_ping, 3);
+                }
+            }
+
+            //this will trigger if we just failed a test
+            if (!game_connected) {
+                game_connected = mp_game_conn_received;
+                mp_game_conn_received = false;
+
+                if (!game_connected) mp_send_msg_packed(mp_msg_ping, 3);
+            }
         }
 
-        if (game_paused || cur_inputs.pause || mp_pause_received == 1) {
-            //consume
-            if (cur_inputs.pause && game_paused == 0) cur_inputs.pause = false;
+        //pause logic
+        if (game_paused || cur_inputs.pause || mp_pause_received == 1 || !game_connected) {
             pause_game();
 
             if (game_over) break;
-        }
 
-        if (multiplayer) {
-            sleep_us(250);
-            mp_sync_ready = false;
-            sleep_us(250);
-            mp_send_msg_packed(mp_msg_ping, 2);
+            //if game just unpaused, deinit pause
+            if (!game_paused) {
+                if (multiplayer) {
+                    if (mp_pause_received == 0) mp_send_msg_packed(mp_msg_pause, 1);
+                    mp_pause_received = 0;
+                }
+
+                game_start_time += to_ms_since_boot(get_absolute_time()) - game_paused_time;
+                song_paused = false;
+            }
+            
         }
 
         if (!game_paused) update_game();
@@ -1376,14 +1392,14 @@ void game_loop() {
         if (!game_paused) render_frame();
 
         wait_and_push_frame();
+        cur_frame_in_sec = (cur_frame_in_sec + 1) % (TARGET_FRAMERATE / 2);
     }
 
     //game over
+    in_game = false;
     cancel_generation_timer();
     cancel_gravity();
     cancel_lock_timer();
-    mp_sync_awaiting = false;
-    mp_sync_ready = false;
     mp_pause_received = 0;
     song_paused = false;
 

@@ -1,12 +1,19 @@
-TODO:
--mp pause on start
--glitched game over
---1: ends randomly without going to game over screen
---2: one side gets disconnect while other gets glitched game over
---3: quits randomly to menu
-X-wrong line width for game over screen text
-X-add arrow to left side of selected options
-X-10 lines for any perfect clear
+bugs to fix:
+X-mp pause doesn't transfer to other console
+X-mp only pauses/unpauses other console every other time
+
+-reconnecting leads to pause-disconnect weird loop
+
+X-red multiplayer is sticky on disconnects
+X--check for disconnect every frame while in red state?
+X--no, but we are forgetting to set some variable here idk
+
+X-only trigger tspin sfx if at least one line cleared
+
+new features (stretch):
+-add more sfx channels
+--if an sfx is triggered and there already is one of the same type playing, it cuts that one short instead of taking a new channel
+-improve the tspin detection and give it proper sfx
 
 ------
 X-score

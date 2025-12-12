@@ -40,7 +40,7 @@ extern uint8_t matrix[M_HEIGHT][M_WIDTH];
 extern uint32_t score;
 extern uint32_t level;
 extern volatile int game_over;
-extern int game_paused;
+extern bool game_paused;
 extern Piece active_piece;
 extern Piece ghost_piece;
 extern int held_piece_shape;
@@ -66,6 +66,8 @@ extern bool fixed_level_system;
 extern int final_time;
 extern int total_lines_cleared;
 extern int total_lines_sent, total_lines_rcvd;
+
+extern volatile bool in_game;
 
 void game_loop();
 void init_game_blank();

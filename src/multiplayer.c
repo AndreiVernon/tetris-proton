@@ -21,7 +21,7 @@
 //note:change UART1_IRQ if you use uart0
 #define UART_IRQ UART1_IRQ
 
-static volatile bool awaiting_pong = false;
+static volatile bool awaiting_ping_pong = false;
 static volatile bool received_pong = false;
 
 volatile bool grav_opt_received = false;
@@ -31,6 +31,7 @@ volatile bool received_ping = false;
 volatile bool mp_sync_ready = false;
 volatile bool mp_sync_awaiting = false;
 volatile int mp_pause_received = 0; //1 = pause, -1 = unpause
+volatile bool mp_game_conn_received = false;
 
 //send a raw byte (blocking)
 static inline bool mp_send_byte(uint8_t b) {
@@ -70,7 +71,10 @@ static void mp_on_uart_irq() {
         switch(msg) {
             case mp_msg_ping:
 				//generic handshake
-				if (arg == 0) mp_send_msg(mp_msg_pong);
+				if (arg == 0) {
+					mp_send_msg(mp_msg_pong);
+					if (awaiting_ping_pong) received_ping = true;
+				}
 
 				//sync
 				if (arg == 2 && mp_sync_awaiting) {
@@ -78,16 +82,16 @@ static void mp_on_uart_irq() {
 					mp_sync_ready = true;
 				}
 
-				//if you quit after disconnection, quit other player too
-				if (arg == 2 && (!multiplayer || cur_screen != game_screen)) {
-					mp_send_msg_packed(mp_msg_game_over, 2);
-				}
+				if (arg == 3) {
+					if (in_game) mp_game_conn_received = true;
 
-				received_ping = true;
+					//if you quit after disconnection, quit other player too
+					if (!in_game) mp_send_msg_packed(mp_msg_game_over, 2);
+				}
                 break;
 
             case mp_msg_pong:
-				if (arg == 0 && awaiting_pong) received_pong = true;
+				if (arg == 0 && awaiting_ping_pong) received_pong = true;
 				if (arg == 2) mp_sync_ready = true;
                 break;
 
@@ -103,7 +107,7 @@ static void mp_on_uart_irq() {
                 break;
 
 			case mp_msg_pause:
-				if (multiplayer && mp_sync_ready) {
+				if (multiplayer && in_game) {
 					if (arg == 0) mp_pause_received = 1;
 					if (arg == 1) mp_pause_received = -1;
 				}
@@ -158,7 +162,7 @@ bool mp_handshake_blocking(uint64_t timeout_us) {
 
 	received_pong = false;
 	received_ping = false;
-	awaiting_pong = true;
+	awaiting_ping_pong = true;
 	mp_send_msg(mp_msg_ping);
 
 	uint64_t wait_until_us = to_us_since_boot(get_absolute_time()) + timeout_us;
@@ -172,7 +176,7 @@ bool mp_handshake_blocking(uint64_t timeout_us) {
 
 	received_pong = false;
 	received_ping = false;
-	awaiting_pong = false;
+	awaiting_ping_pong = false;
 
 	return success;
 }
