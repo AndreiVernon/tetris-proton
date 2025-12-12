@@ -1,19 +1,11 @@
 bugs to fix:
-X-mp pause doesn't transfer to other console
-X-mp only pauses/unpauses other console every other time
-
--reconnecting leads to pause-disconnect weird loop
-
-X-red multiplayer is sticky on disconnects
-X--check for disconnect every frame while in red state?
-X--no, but we are forgetting to set some variable here idk
-
-X-only trigger tspin sfx if at least one line cleared
 
 new features (stretch):
 -add more sfx channels
 --if an sfx is triggered and there already is one of the same type playing, it cuts that one short instead of taking a new channel
--improve the tspin detection and give it proper sfx
+-improve the tspin detection
+-visual effect for line clear
+-multiplayer time attack mode (highest score in given time)
 
 ------
 X-score
@@ -65,37 +57,37 @@ X--add pause text
 X-game over
 X--conditions
 X--game over screens
--scoring
---combo recognition
---perfect clear recognition
---t-spin recognition
--marathon game mode
---select starting level
+X-scoring
+X--combo recognition
+X--perfect clear recognition
+X--t-spin recognition
+X-marathon game mode
+X--select starting level
 -high score?
 
 Multiplayer Game Logic:
 X-win logic
 -different gamemodes
---battle / attack / garbage
+X--battle / attack / garbage
 --highest score under time limit (time attack)
 X-keeping game synced
 X--no pause in mp
---in main menu, if you select mp, the text will flash until the other console also chooses mp
+X--in main menu, if you select mp, the text will flash until the other console also chooses mp
 X--when both select mp, a ping will be sent which will be used to start the game at the same time
--garbage progress bar
+X-garbage progress bar
 X-add garbage to game
 X--use shift_lines to move existing lines up before adding garbage at bottom
--additional scoring
+X-additional scoring
 
 Misc Logic:
--Logic for menus / options
+X-Logic for menus / options
 X-System to switch between "screens" (game screen, menu screen, )
 
 Graphics:
 X-frame timing
--render menus
---option cycling and moving between options
---score and time in-game
+X-render menus
+X--option cycling and moving between options
+X--score and time in-game
 X-render static game elements
 X--arena, "hold", "next"
 X-garbage progress bar

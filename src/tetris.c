@@ -11,6 +11,8 @@
 #include "sound.h"
 #include "multiplayer.h"
 
+#define DISCONNECT_CHECK_GAP 2
+
 #define GENERATION_DELAY 0.1    //in s
 #define MP_LEVEL_TIMER_DEF 20        //how long it takes to increase level by 1 in multiplayer
 #define GRAVITY_INCREASE 0.007
@@ -1341,7 +1343,7 @@ void game_loop() {
         mp_game_conn_received = true;
     }
 
-    int cur_frame_in_sec = 0;
+    int cur_frame = 0;
     in_game = true;
 
     while (game_over == 0) {
@@ -1349,22 +1351,12 @@ void game_loop() {
 
         //game connection check
         if (multiplayer) {
-            if (game_connected) {
-                if (cur_frame_in_sec == 0) {
-                    game_connected = mp_game_conn_received;
-                    mp_game_conn_received = false;
-
-                } else if (cur_frame_in_sec == TARGET_FRAMERATE / 4) {
-                    mp_send_msg_packed(mp_msg_ping, 3);
-                }
-            }
-
-            //this will trigger if we just failed a test
-            if (!game_connected) {
+            if (cur_frame == 0) {
                 game_connected = mp_game_conn_received;
                 mp_game_conn_received = false;
 
-                if (!game_connected) mp_send_msg_packed(mp_msg_ping, 3);
+            } else if (cur_frame == DISCONNECT_CHECK_GAP - 1) {
+                mp_send_msg_packed(mp_msg_ping, 3);
             }
         }
 
@@ -1392,7 +1384,7 @@ void game_loop() {
         if (!game_paused) render_frame();
 
         wait_and_push_frame();
-        cur_frame_in_sec = (cur_frame_in_sec + 1) % (TARGET_FRAMERATE / 2);
+        cur_frame = (cur_frame + 1) % DISCONNECT_CHECK_GAP;
     }
 
     //game over
