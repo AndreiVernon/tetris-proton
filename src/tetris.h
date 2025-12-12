@@ -53,7 +53,6 @@ extern const int piece_mask_sizes[7];
 extern const uint8_t piece_masks[7][25];
 
 extern bool multiplayer;
-extern bool mp_test_en;
 extern volatile int garbage_queue;
 
 extern uint32_t game_start_time;

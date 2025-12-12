@@ -1,6 +1,9 @@
 bugs to fix:
+X-randomly quits to menu at beginning of game
+X--prob due to one console pinging for sync before the other sets in_game
 
 new features (stretch):
+-if both consoles game over at the same time, decide winner based on in game time at which they died
 -add more sfx channels
 --if an sfx is triggered and there already is one of the same type playing, it cuts that one short instead of taking a new channel
 -improve the tspin detection

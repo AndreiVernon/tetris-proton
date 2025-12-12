@@ -11,7 +11,7 @@
 #include "sound.h"
 #include "multiplayer.h"
 
-#define DISCONNECT_CHECK_GAP 2
+#define DISCONNECT_CHECK_GAP 4 //check for connection presence every x frames
 
 #define GENERATION_DELAY 0.1    //in s
 #define MP_LEVEL_TIMER_DEF 20        //how long it takes to increase level by 1 in multiplayer
@@ -65,7 +65,6 @@ repeating_timer_t lock_timer = {0};
 int lock_reset_count = 0;     //number of times lock timer has been reset
 int lowest_height_reached = M_HEIGHT;
 
-bool mp_test_en = false;
 bool multiplayer = false;
 volatile int garbage_queue = 0;   //neg is receiving, pos is sending
 
@@ -257,7 +256,7 @@ void lock_piece() {
         }
         nested_break:
 
-        if (oob) game_over += 1;
+        if (oob) game_over = 1;
     }
 
     play_audio(PIECE_LOCK_SFX, true);
@@ -337,7 +336,7 @@ void spawn_piece(int new_shape) {
     }
 
     //game over check
-    game_over += is_colliding(false);
+    game_over = is_colliding(false);
 
     lowest_height_reached = active_piece.y;
 }
@@ -521,7 +520,7 @@ void shift_lines(int row, int amount) {
         for (int y = 20; y < M_HEIGHT; y++) {
             for (int x = 0; x < M_WIDTH; x++) {
                 if (matrix[y][x] != EMPTY) {
-                    game_over += 1;
+                    game_over = 1;
                     goto nested_break;
                 }
             }
@@ -1198,34 +1197,6 @@ void update_game() {
 
 };
 
-void mp_test() {
-    int i = 0;
-    received_ping = false;
-
-    while (1) {
-        if (received_ping) {
-            matrix[i / M_WIDTH][i % M_WIDTH] = O_PIECE;
-            i++;
-        }
-
-        received_ping = false;
-        get_inputs();
-
-        if (cur_inputs.rot_right) {
-            int col;
-
-            if (mp_handshake_blocking(250)) col = S_PIECE;
-            else col = Z_PIECE;
-
-            matrix[i / M_WIDTH][i % M_WIDTH] = col;
-            i++;
-        }
-
-        render_frame();
-        wait_and_push_frame();
-    }
-}
-
 void pause_game() {
     //pause init
     if (!game_paused) {
@@ -1329,11 +1300,7 @@ void game_loop() {
     }
 
     play_audio(GAME_START_SFX, true);
-    sleep_ms(3200);
-
-    play_audio(song_choice, false);
-
-    if (multiplayer && mp_test_en) mp_test();
+    sleep_ms(3150);
 
     game_start_time = to_ms_since_boot(get_absolute_time());
     level = start_level_effective;
@@ -1345,6 +1312,9 @@ void game_loop() {
 
     int cur_frame = 0;
     in_game = true;
+    sleep_ms(50);
+
+    play_audio(song_choice, false);
 
     while (game_over == 0) {
         get_inputs();
@@ -1354,8 +1324,7 @@ void game_loop() {
             if (cur_frame == 0) {
                 game_connected = mp_game_conn_received;
                 mp_game_conn_received = false;
-
-            } else if (cur_frame == DISCONNECT_CHECK_GAP - 1) {
+            } else {
                 mp_send_msg_packed(mp_msg_ping, 3);
             }
         }
