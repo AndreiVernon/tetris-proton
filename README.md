@@ -1,6 +1,6 @@
 # Tetris - Purdue Proton
 
-This project implements a multiplayer Tetris variant on the Purdue Proton development board, which uses the same 2350B microcontroller as the Raspberry Pi Pico 2.
+This project implements a multiplayer Tetris variant on the Raspberry Pi 2350B, also found on the Raspberry Pi Pico 2.
 
 ## Overview
 
@@ -10,7 +10,7 @@ Gameplay uses an NES controller for input, includes custom audio playback over P
 ## Core Features
 
 - **LED Matrix Graphics**  
-  Rendering to a 64×64 Adafruit matrix using GPIO and DMA-driven framebuffer updates.
+  Rendering to a 64×64 Adafruit matrix using PIO and two framebuffers.
 
 - **NES Controller Input**  
   GPIO-based polling and detection of an original NES controller.
