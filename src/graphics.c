@@ -8,6 +8,7 @@
 #include "tetris.h"
 #include "display.h"
 #include "assets.h"
+#include "input.h"
 
 #define MATRIX_OFFSET_X 11  //how many px from left pieces are drawn
 #define MATRIX_OFFSET_Y 18  //how many px from bottom pieces are drawn
@@ -471,27 +472,34 @@ void render_options(int cur_sel) {
     else strcpy(text2, text);
     draw_text(text2, 62, 41, 1, false, false, cur_sel == 0 ? SELECTED_TEXT : UNSELECTED_TEXT);
 
-    draw_text("start level:", 2, 34, -1, false, false, I_PIECE);
-    snprintf(text, sizeof(text), "%02d", start_level);
+    draw_text("hard drop:", 2, 34, -1, false, false, I_PIECE);
+    if (!hard_drop_dir) strcpy(text, "dwn");
+    else strcpy(text, "up");
     if (cur_sel == 1) snprintf(text2, sizeof(text2), "<%s>", text);
     else strcpy(text2, text);
     draw_text(text2, 62, 34, 1, false, false, cur_sel == 1 ? SELECTED_TEXT : UNSELECTED_TEXT);
 
-    draw_text("goal:", 2, 27, -1, false, false, I_PIECE);
-    if (fixed_level_system) strcpy(text, "fixed");
-    else strcpy(text, "variable");
+    draw_text("start level:", 2, 27, -1, false, false, I_PIECE);
+    snprintf(text, sizeof(text), "%02d", start_level);
     if (cur_sel == 2) snprintf(text2, sizeof(text2), "<%s>", text);
     else strcpy(text2, text);
     draw_text(text2, 62, 27, 1, false, false, cur_sel == 2 ? SELECTED_TEXT : UNSELECTED_TEXT);
 
-    draw_text("grav time:", 2, 20, -1, false, false, I_PIECE);
-    if (mp_level_timer > 0 && mp_level_timer < 41) snprintf(text, sizeof(text), "%02d", mp_level_timer);
-    else strcpy(text, "off");
+    draw_text("goal:", 2, 20, -1, false, false, I_PIECE);
+    if (fixed_level_system) strcpy(text, "fixed");
+    else strcpy(text, "variable");
     if (cur_sel == 3) snprintf(text2, sizeof(text2), "<%s>", text);
     else strcpy(text2, text);
     draw_text(text2, 62, 20, 1, false, false, cur_sel == 3 ? SELECTED_TEXT : UNSELECTED_TEXT);
 
-    draw_text("back", 32, 7, 0, false, cur_sel == 4, cur_sel == 4 ? SELECTED_TEXT : UNSELECTED_TEXT);
+    draw_text("grav time:", 2, 13, -1, false, false, I_PIECE);
+    if (mp_level_timer > 0 && mp_level_timer < 41) snprintf(text, sizeof(text), "%02d", mp_level_timer);
+    else strcpy(text, "off");
+    if (cur_sel == 4) snprintf(text2, sizeof(text2), "<%s>", text);
+    else strcpy(text2, text);
+    draw_text(text2, 62, 13, 1, false, false, cur_sel == 4 ? SELECTED_TEXT : UNSELECTED_TEXT);
+
+    draw_text("back", 32, 3, 0, false, cur_sel == 5, cur_sel == 5 ? SELECTED_TEXT : UNSELECTED_TEXT);
 }
 
 void render_game_over(int cur_sel, bool mp_wait, bool game_was_mp) {

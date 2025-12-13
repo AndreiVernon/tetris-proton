@@ -16,6 +16,8 @@ typedef struct {
     bool up, down, left_edge, right_edge, a, b, select, start; //for menus
 } InputState;
 
+bool hard_drop_dir;
+
 extern RawInputState raw_inputs;
 extern InputState cur_inputs;
 

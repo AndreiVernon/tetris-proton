@@ -11,6 +11,8 @@
 RawInputState raw_inputs = {0};
 InputState cur_inputs = {0};
 
+bool hard_drop_dir = 0; //0 = down, 1 = up
+
 static uint64_t left_press_time, left_last_rep;
 static uint64_t right_press_time, right_last_rep;
 static bool last_move_dir; //0 = left, 1 = right
@@ -168,4 +170,10 @@ void get_inputs(void) {
     cur_inputs.b = cur_inputs.rot_left;
     cur_inputs.start = cur_inputs.hold;
     cur_inputs.select = cur_inputs.pause;
+
+    if (hard_drop_dir) {
+        //swap hard and soft
+        cur_inputs.soft_drop = raw_inputs.down;
+        cur_inputs.hard_drop = cur_inputs.up;
+    }
 }

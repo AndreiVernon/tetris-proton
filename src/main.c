@@ -105,13 +105,14 @@ void main_menu_loop() {
 
 void options_loop() {
     int cur_sel = 0;
-    int NUM_OPTS = 5;
+    int NUM_OPTS = 6;
 
     //0 - song
-    //1 - starting level
-    //2 - goal (variable vs fixed)
-    //3 - mp gravity time
-    //4 - back
+    //1 - hard drop dir
+    //2 - starting level
+    //3 - goal (variable vs fixed)
+    //4 - mp gravity time
+    //5 - back
     
     render_options(cur_sel);
     fade(250, 1);
@@ -133,7 +134,7 @@ void options_loop() {
 
         //numerical adjustment
         if (cur_inputs.left || cur_inputs.right) {
-            if (cur_sel == 1) {
+            if (cur_sel == 2) {
                 if (cur_inputs.left && start_level > 1) {
                     start_level--;
                     play_audio(MOVE_SFX, true);
@@ -145,7 +146,7 @@ void options_loop() {
                 }
             }
 
-            if (cur_sel == 3) {
+            if (cur_sel == 4) {
                 if (cur_inputs.left && mp_level_timer > 1) {
                     mp_level_timer--;
                     play_audio(MOVE_SFX, true);
@@ -167,14 +168,19 @@ void options_loop() {
                 play_audio(song_choice, false);
             }
 
-            if (cur_sel == 2) {
+            if (cur_sel == 1) {
+                hard_drop_dir = !hard_drop_dir;
+                play_audio(SWITCH_OPTION_SFX, true);
+            }
+
+            if (cur_sel == 3) {
                 fixed_level_system = !fixed_level_system;
                 play_audio(SWITCH_OPTION_SFX, true);
             }
         }
 
         //go back
-        if ((cur_sel == 4 && (cur_inputs.a || cur_inputs.start)) || cur_inputs.b) {
+        if ((cur_sel == 5 && (cur_inputs.a || cur_inputs.start)) || cur_inputs.b) {
             play_audio(SELECT_OPTION_SFX, true);
             break;
         }
