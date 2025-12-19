@@ -1,6 +1,5 @@
 bugs to fix:
-X-randomly quits to menu at beginning of game
-X--prob due to one console pinging for sync before the other sets in_game
+-soft drop is broken at higher levels
 
 new features (stretch):
 -if both consoles game over at the same time, decide winner based on in game time at which they died
