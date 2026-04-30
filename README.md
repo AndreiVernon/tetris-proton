@@ -23,7 +23,7 @@ Gameplay uses an NES controller for input, includes custom audio playback over P
 
 ## Team Roles
 
-- **Andrei** – game logic, graphics, art, music, display driver, input driver, multiplayer hardware and software, coordination
+- **Andrei** – game logic, graphics, art, music, display driver, input driver, multiplayer hardware and software
 - **Raahil** – display hardware
 - **Amy** – audio hardware and driver
 - **Davis** – input hardware
