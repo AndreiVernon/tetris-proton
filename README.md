@@ -10,23 +10,23 @@ Gameplay uses an NES controller for input, includes custom audio playback over P
 ## Core Features
 
 - **LED Matrix Graphics**  
-  Rendering to a 64×64 Adafruit matrix using PIO and two framebuffers.
+  Rendering to a 64×64 Adafruit matrix using PIO and two framebuffers. Display driver written from scratch, art drawn by hand.
 
 - **NES Controller Input**  
   GPIO-based polling and detection of an original NES controller.
 
 - **Multiplayer Support**  
-  Board-to-board communication over UART via a USB-A cable for real-time competitive gameplay.
+  Board-to-board communication over UART via a USB-A cable for real-time competitive gameplay. Advanced sync logic ensures game states don't desynchronize.
 
 - **Audio System**
   PWM-based playback of music and sound effects through a filtered line-level output, with double-buffered DMA streaming.
 
 ## Team Roles
 
-- **Andrei** – game logic and coordination
-- **Raahil** – graphics engine, enclosure design  
-- **Amy** – audio system and UI  
-- **Davis** – multiplayer communication and input hardware
+- **Andrei** – game logic, graphics, art, music, display driver, input driver, multiplayer hardware and software, coordination
+- **Raahil** – display hardware
+- **Amy** – audio hardware and driver
+- **Davis** – input hardware
 
 ## References
 
